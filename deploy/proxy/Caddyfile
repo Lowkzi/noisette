@@ -1,7 +1,7 @@
-{$RENARDEAU_DOMAIN} {
+renardeau.balenho.fr {
     reverse_proxy renardeau_app:3000
 }
 
-{$NOISETTE_DOMAIN} {
+noisette.balenho.fr {
     reverse_proxy noisette_app:3000
 }
