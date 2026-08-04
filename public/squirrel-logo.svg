@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Écureuil Noisette">
+  <defs>
+    <linearGradient id="fur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4ade80"/>
+      <stop offset="100%" stop-color="#16a34a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- queue touffue -->
+  <path d="M78 100
+           C 112 108 128 74 116 48
+           C 110 34 92 28 80 36
+           C 100 34 112 50 108 66
+           C 104 80 90 84 80 76
+           C 92 82 92 96 78 100 Z"
+        fill="url(#fur)" stroke="#166534" stroke-width="2.5" stroke-linejoin="round"/>
+
+  <!-- corps assis -->
+  <ellipse cx="54" cy="92" rx="26" ry="22" fill="url(#fur)" stroke="#166534" stroke-width="2.5"/>
+
+  <!-- ventre clair -->
+  <ellipse cx="54" cy="96" rx="16" ry="14" fill="#f0fdf4"/>
+
+  <!-- noisette tenue par les pattes -->
+  <ellipse cx="54" cy="98" rx="9" ry="8" fill="#b45309"/>
+  <path d="M47 96 C 47 90 53 87 58 90" fill="none" stroke="#78350f" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- pattes -->
+  <ellipse cx="44" cy="98" rx="5" ry="4.5" fill="url(#fur)" stroke="#166534" stroke-width="2"/>
+  <ellipse cx="64" cy="98" rx="5" ry="4.5" fill="url(#fur)" stroke="#166534" stroke-width="2"/>
+
+  <!-- tête -->
+  <circle cx="52" cy="52" r="26" fill="url(#fur)" stroke="#166534" stroke-width="2.5"/>
+
+  <!-- joues rondes -->
+  <circle cx="36" cy="58" r="8" fill="#f0fdf4"/>
+  <circle cx="60" cy="60" r="9" fill="#f0fdf4"/>
+
+  <!-- oreilles -->
+  <circle cx="34" cy="30" r="9" fill="url(#fur)" stroke="#166534" stroke-width="2.5"/>
+  <circle cx="34" cy="30" r="4" fill="#f0fdf4"/>
+  <circle cx="66" cy="28" r="9" fill="url(#fur)" stroke="#166534" stroke-width="2.5"/>
+  <circle cx="66" cy="28" r="4" fill="#f0fdf4"/>
+
+  <!-- museau -->
+  <ellipse cx="50" cy="64" rx="9" ry="7" fill="#f0fdf4"/>
+  <circle cx="50" cy="62" r="1.8" fill="#166534"/>
+
+  <!-- grands yeux mignons -->
+  <circle cx="42" cy="48" r="6.5" fill="#1c1917"/>
+  <circle cx="43.8" cy="45.6" r="2" fill="#ffffff"/>
+  <circle cx="63" cy="47" r="6.5" fill="#1c1917"/>
+  <circle cx="64.8" cy="44.6" r="2" fill="#ffffff"/>
+
+  <!-- joues roses -->
+  <circle cx="34" cy="58" r="4" fill="#fca5a5" opacity="0.55"/>
+  <circle cx="70" cy="56" r="4" fill="#fca5a5" opacity="0.55"/>
+
+  <!-- sourire -->
+  <path d="M46 66 Q 50 70 54 66" fill="none" stroke="#166534" stroke-width="2" stroke-linecap="round"/>
+</svg>

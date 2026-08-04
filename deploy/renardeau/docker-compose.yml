@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: renardeau_db_prod
+    restart: always
+    environment:
+      POSTGRES_USER: admin_renardeau
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: renardeau_garde_prod
+    volumes:
+      - renardeau_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin_renardeau"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - renardeau-network
+
+  app:
+    image: ghcr.io/${GITHUB_USERNAME}/renardeau:latest
+    container_name: renardeau_app
+    restart: always
+    environment:
+      DATABASE_URL: "postgresql://admin_renardeau:${DB_PASSWORD}@db:5432/renardeau_garde_prod?schema=public"
+      SESSION_SECRET: ${SESSION_SECRET}
+      NEXT_PUBLIC_APP_URL: https://${MY_DOMAIN}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - renardeau-network
+      - shared-proxy
+
+volumes:
+  renardeau_db_data:
+
+networks:
+  renardeau-network:
+    driver: bridge
+  shared-proxy:
+    external: true

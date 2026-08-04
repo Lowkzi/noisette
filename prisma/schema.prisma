@@ -1,0 +1,196 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  OWNER
+  MEMBER
+}
+
+enum CategoryKind {
+  EXPENSE
+  INCOME
+}
+
+enum TransactionType {
+  EXPENSE
+  INCOME
+  TRANSFER
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  CASH
+  OTHER
+}
+
+model Household {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  members        User[]
+  accounts       Account[]
+  categories     Category[]
+  transactions   Transaction[]
+  budgets        Budget[]
+  savingsGoals   SavingsGoal[]
+  recurringBills RecurringBill[]
+  invites        HouseholdInvite[]
+}
+
+model User {
+  id       String @id @default(cuid())
+  name     String?
+  email    String @unique
+  password String // Haché (bcrypt)
+  role     Role   @default(MEMBER)
+
+  householdId String?
+  household   Household? @relation(fields: [householdId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  transactionsCreated Transaction[]     @relation("TransactionCreatedBy")
+  transactionSplits    TransactionSplit[]
+  invitesSent          HouseholdInvite[] @relation("InvitedBy")
+}
+
+model HouseholdInvite {
+  id          String    @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  email       String
+  invitedById String
+  invitedBy   User      @relation("InvitedBy", fields: [invitedById], references: [id])
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model Account {
+  id             String      @id @default(cuid())
+  householdId    String
+  household      Household   @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  name           String
+  type           AccountType @default(CHECKING)
+  currentBalance Float       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions Transaction[]
+  recurringBills RecurringBill[]
+}
+
+model Category {
+  id          String       @id @default(cuid())
+  householdId String
+  household   Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  name        String
+  kind        CategoryKind @default(EXPENSE)
+  color       String?
+  icon        String?
+
+  createdAt DateTime @default(now())
+
+  transactions   Transaction[]
+  budgets        Budget[]
+  recurringBills RecurringBill[]
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  householdId String
+  household   Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  accountId   String
+  account     Account         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  categoryId  String?
+  category    Category?       @relation(fields: [categoryId], references: [id])
+
+  amount      Float           // Toujours positif ; le signe est donné par `type`
+  date        DateTime
+  label       String
+  note        String?
+  type        TransactionType @default(EXPENSE)
+
+  // Dépense partagée entre membres du foyer : si isShared, les parts sont détaillées
+  // dans `splits` (montant dû par chaque membre). V1 simple : pas de règles de répartition
+  // complexes, juste un montant par membre.
+  isShared Boolean            @default(false)
+  splits   TransactionSplit[]
+
+  createdById String
+  createdBy   User     @relation("TransactionCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Part d'une dépense partagée due par un membre du foyer donné.
+model TransactionSplit {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shareAmount   Float
+
+  @@unique([transactionId, userId])
+}
+
+// Budget mensuel par catégorie. Le montant dépensé est calculé à la volée à partir des
+// Transaction du mois plutôt que dénormalisé ici.
+model Budget {
+  id             String   @id @default(cuid())
+  householdId    String
+  household      Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  categoryId     String
+  category       Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  month          DateTime // Toujours le 1er du mois concerné
+  plannedAmount  Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([categoryId, month])
+}
+
+model SavingsGoal {
+  id            String    @id @default(cuid())
+  householdId   String
+  household     Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  name          String
+  targetAmount  Float
+  currentAmount Float     @default(0)
+  targetDate    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RecurringBill {
+  id           String    @id @default(cuid())
+  householdId  String
+  household    Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  label        String
+  amount       Float
+  dueDayOfMonth Int      // 1-31
+  categoryId   String?
+  category     Category? @relation(fields: [categoryId], references: [id])
+  accountId    String?
+  account      Account?  @relation(fields: [accountId], references: [id])
+  isActive     Boolean   @default(true)
+  // Nombre de jours avant l'échéance pour afficher un rappel sur le tableau de bord.
+  reminderDaysBefore Int @default(3)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

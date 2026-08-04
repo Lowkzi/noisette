@@ -1,0 +1,7 @@
+{$RENARDEAU_DOMAIN} {
+    reverse_proxy renardeau_app:3000
+}
+
+{$NOISETTE_DOMAIN} {
+    reverse_proxy noisette_app:3000
+}
