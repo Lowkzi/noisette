@@ -77,8 +77,16 @@ export default async function BudgetPage({
   const prevMonthStart = new Date(year, monthNum - 2, 1);
   const isCurrentMonth = now >= monthStart && now < monthEnd;
 
-  const [categories, budgets, transactions, prevTransactions, incomeTransactions, incomeBills, expenseBills] =
-    await Promise.all([
+  const [
+    categories,
+    budgets,
+    transactions,
+    prevTransactions,
+    incomeTransactions,
+    incomingTransfers,
+    incomeBills,
+    expenseBills,
+  ] = await Promise.all([
       prisma.category.findMany({ where: { householdId, kind: "EXPENSE" }, orderBy: { name: "asc" } }),
       // Tous les objectifs définis jusqu'à ce mois inclus, pour ce compte : le plus récent par
       // catégorie fait foi pour ce mois (report automatique), sauf override explicite sur ce mois.
@@ -108,6 +116,11 @@ export default async function BudgetPage({
       prisma.transaction.findMany({
         where: { householdId, accountId, type: "INCOME", date: { gte: monthStart, lt: monthEnd } },
         select: { amount: true, label: true },
+      }),
+      // Virements reçus sur ce compte ce mois-ci : un crédit compte comme une entrée d'argent.
+      prisma.transaction.findMany({
+        where: { householdId, toAccountId: accountId, type: "TRANSFER", date: { gte: monthStart, lt: monthEnd } },
+        select: { amount: true, label: true, account: { select: { name: true } } },
       }),
       prisma.recurringBill.findMany({
         where: { householdId, accountId, kind: "INCOME", isActive: true },
@@ -167,7 +180,8 @@ export default async function BudgetPage({
     { spent: 0, spentPrev: 0, planned: 0, committed: 0, unplanned: 0 }
   );
 
-  const totalIncome = incomeTransactions.reduce((s, t) => s + t.amount, 0);
+  const totalIncomingTransfers = incomingTransfers.reduce((s, t) => s + t.amount, 0);
+  const totalIncome = incomeTransactions.reduce((s, t) => s + t.amount, 0) + totalIncomingTransfers;
   // Revenus récurrents attendus ce mois-ci mais pas encore marqués comme reçus (seulement pertinent
   // pour le mois en cours ; un mois passé/futur n'a pas de statut "reçu" à afficher).
   const expectedIncome = isCurrentMonth
@@ -200,13 +214,19 @@ export default async function BudgetPage({
       <div className="grid sm:grid-cols-2 gap-4">
         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-2">
           <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wide">Entrées d&apos;argent</p>
-          {incomeTransactions.length === 0 && expectedIncome.length === 0 ? (
+          {incomeTransactions.length === 0 && incomingTransfers.length === 0 && expectedIncome.length === 0 ? (
             <p className="text-sm text-slate-500">Aucun revenu enregistré ce mois-ci.</p>
           ) : (
             <div className="space-y-1 text-sm">
               {incomeTransactions.map((t, i) => (
                 <div key={i} className="flex items-center justify-between text-slate-300">
                   <span>{t.label}</span>
+                  <span>{t.amount.toFixed(2)} €</span>
+                </div>
+              ))}
+              {incomingTransfers.map((t, i) => (
+                <div key={i} className="flex items-center justify-between text-sky-400">
+                  <span>{t.label} (virement de {t.account.name})</span>
                   <span>{t.amount.toFixed(2)} €</span>
                 </div>
               ))}

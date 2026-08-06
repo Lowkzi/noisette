@@ -35,10 +35,12 @@ export function TransactionRow({
   transaction: t,
   accounts,
   categories,
+  viewAccountId,
 }: {
   transaction: Transaction;
   accounts: Account[];
   categories: Category[];
+  viewAccountId?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const boundUpdate = updateTransaction.bind(null, t.id);
@@ -50,6 +52,11 @@ export function TransactionRow({
     type === "INCOME" ? c.kind === "INCOME" : c.kind === "EXPENSE"
   );
   const destinationAccounts = accounts.filter((a) => a.id !== accountId);
+
+  // Un virement est un crédit (vert, +) quand on regarde le compte de destination, un débit
+  // (rouge, −) quand on regarde le compte source ou en vue "Tous les comptes".
+  const isCreditView = t.type === "INCOME" || (t.type === "TRANSFER" && viewAccountId === t.toAccountId);
+  const isDebitView = t.type === "EXPENSE" || t.type === "DIRECT_DEBIT" || (t.type === "TRANSFER" && viewAccountId === t.accountId);
 
   if (!editing) {
     return (
@@ -72,14 +79,10 @@ export function TransactionRow({
         <div className="text-right shrink-0 space-y-1">
           <p
             className={`font-semibold ${
-              t.type === "INCOME"
-                ? "text-emerald-400"
-                : t.type === "EXPENSE" || t.type === "DIRECT_DEBIT"
-                  ? "text-red-400"
-                  : "text-slate-300"
+              isCreditView ? "text-emerald-400" : isDebitView ? "text-red-400" : "text-slate-300"
             }`}
           >
-            {t.type === "INCOME" ? "+" : t.type === "EXPENSE" || t.type === "DIRECT_DEBIT" ? "-" : ""}
+            {isCreditView ? "+" : isDebitView ? "-" : ""}
             {t.amount.toFixed(2)} €
           </p>
           <div className="flex items-center gap-2 justify-end">

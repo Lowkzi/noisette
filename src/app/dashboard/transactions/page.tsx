@@ -32,7 +32,7 @@ export default async function TransactionsPage({
     where: {
       householdId,
       date: { gte: monthStart, lt: monthEnd },
-      ...(params.accountId ? { accountId: params.accountId } : {}),
+      ...(params.accountId ? { OR: [{ accountId: params.accountId }, { toAccountId: params.accountId }] } : {}),
       ...(params.categoryId ? { categoryId: params.categoryId } : {}),
     },
     include: { account: true, toAccount: true, category: true, splits: { include: { user: true } } },
@@ -111,7 +111,13 @@ export default async function TransactionsPage({
 
       <div className="divide-y divide-slate-800 border border-slate-800 rounded-xl overflow-hidden">
         {transactions.map((t) => (
-          <TransactionRow key={t.id} transaction={t} accounts={accounts} categories={categories} />
+          <TransactionRow
+            key={t.id}
+            transaction={t}
+            accounts={accounts}
+            categories={categories}
+            viewAccountId={params.accountId}
+          />
         ))}
         {transactions.length === 0 && (
           <p className="text-slate-500 text-sm p-4">Aucune transaction pour ce mois.</p>
