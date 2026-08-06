@@ -69,7 +69,7 @@ export default async function TransactionsPage({
       )}
 
       <div className="bg-slate-800/30 border border-slate-800 rounded-xl p-4">
-        <CategoryQuickAdd />
+        <CategoryQuickAdd categories={categories} />
       </div>
 
       <form className="flex flex-wrap gap-3 items-end text-sm" method="get">
