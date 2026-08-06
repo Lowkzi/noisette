@@ -129,14 +129,21 @@ export default async function DashboardPage() {
           </p>
           {accounts.length > 0 && (
             <div className="mt-2 pt-2 border-t border-slate-700 space-y-1">
-              {accounts.map((a) => (
-                <div key={a.id} className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400 truncate">{a.name}</span>
-                  <span className={a.currentBalance < 0 ? "text-red-400" : "text-slate-300"}>
-                    {a.currentBalance.toFixed(2)} €
-                  </span>
-                </div>
-              ))}
+              {accounts.map((a) => {
+                const cushionBreached = cushionsBelow.some((g) => g.accountId === a.id);
+                const isNegative = a.currentBalance < 0;
+                return (
+                  <div key={a.id} className="flex items-center justify-between text-xs">
+                    <span className={`truncate ${cushionBreached ? "text-red-400" : "text-slate-400"}`}>
+                      {cushionBreached && "⚠️ "}
+                      {a.name}
+                    </span>
+                    <span className={cushionBreached || isNegative ? "text-red-400" : "text-slate-300"}>
+                      {a.currentBalance.toFixed(2)} €
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </Link>
