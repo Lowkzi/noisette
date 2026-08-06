@@ -10,6 +10,10 @@ function isPaidThisMonth(lastPaidAt: Date | null) {
   return paid.getFullYear() === now.getFullYear() && paid.getMonth() === now.getMonth();
 }
 
+function isOverdue(dueDayOfMonth: number) {
+  return new Date().getDate() > dueDayOfMonth;
+}
+
 export default async function DashboardPage() {
   const householdId = await getHouseholdId();
   if (!householdId) return <p className="text-slate-500">Foyer introuvable.</p>;
@@ -244,7 +248,13 @@ export default async function DashboardPage() {
                   <span className="text-slate-400 text-sm">
                     {b.amount.toFixed(2)} € · dans {b.daysUntil} j.
                   </span>
-                  {b.accountId && <PayBillButton billId={b.id} paid={isPaidThisMonth(b.lastPaidAt)} />}
+                  {b.accountId && (
+                    <PayBillButton
+                      billId={b.id}
+                      paid={isPaidThisMonth(b.lastPaidAt)}
+                      overdue={isOverdue(b.dueDayOfMonth)}
+                    />
+                  )}
                 </div>
               </div>
             ))}

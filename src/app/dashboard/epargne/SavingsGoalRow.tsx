@@ -32,7 +32,7 @@ export function SavingsGoalRow({ goal, accounts }: { goal: Goal; accounts: Accou
         <div className="flex items-center justify-between">
           <div>
             <p className="font-medium flex items-center gap-1.5">
-              {below && <span>⚠️</span>} {goal.name}
+              {below ? <span>⚠️</span> : <span className="text-emerald-400">✓</span>} {goal.name}
             </p>
             <p className="text-xs text-slate-400">Coussin financier · {goal.account.name}</p>
           </div>
@@ -92,52 +92,61 @@ export function SavingsGoalRow({ goal, accounts }: { goal: Goal; accounts: Accou
       <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
         <div className="h-full bg-green-500" style={{ width: `${pct}%` }} />
       </div>
+      <p className="text-sm text-slate-400">
+        {goal.currentAmount.toFixed(2)} € / {goal.targetAmount.toFixed(2)} € ({pct.toFixed(0)}%)
+      </p>
       <form
         action={async (formData) => {
           setPending(true);
           await updateSavingsGoalAmount(goal.id, formData);
           setPending(false);
         }}
-        className="flex items-center gap-2 text-sm"
+        className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1"
       >
-        <span className="text-slate-400">
-          {goal.currentAmount.toFixed(2)} € / {goal.targetAmount.toFixed(2)} € ({pct.toFixed(0)}%)
-        </span>
-        <input
-          name="currentAmount"
-          type="number"
-          step="0.01"
-          min="0"
-          defaultValue={goal.currentAmount}
-          className="w-24 rounded-lg bg-slate-800 border border-slate-700 px-2 py-1 text-sm"
-        />
-        <input
-          name="monthlyContribution"
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder="€/mois"
-          defaultValue={goal.monthlyContribution ?? ""}
-          className="w-24 rounded-lg bg-slate-800 border border-slate-700 px-2 py-1 text-sm"
-        />
+        <div>
+          <label className="block text-[11px] text-slate-500 mb-0.5">Montant actuel</label>
+          <input
+            name="currentAmount"
+            type="number"
+            step="0.01"
+            min="0"
+            defaultValue={goal.currentAmount}
+            className="w-full rounded-lg bg-slate-800 border border-slate-700 px-2 py-1.5 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-[11px] text-slate-500 mb-0.5">€/mois</label>
+          <input
+            name="monthlyContribution"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="—"
+            defaultValue={goal.monthlyContribution ?? ""}
+            className="w-full rounded-lg bg-slate-800 border border-slate-700 px-2 py-1.5 text-sm"
+          />
+        </div>
         {accounts.length > 0 && (
-          <select
-            name="accountId"
-            defaultValue={goal.account?.id ?? ""}
-            className="rounded-lg bg-slate-800 border border-slate-700 px-2 py-1 text-sm"
-          >
-            <option value="">Aucun compte</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
+          <div>
+            <label className="block text-[11px] text-slate-500 mb-0.5">Compte</label>
+            <select
+              name="accountId"
+              defaultValue={goal.account?.id ?? ""}
+              className="w-full rounded-lg bg-slate-800 border border-slate-700 px-2 py-1.5 text-sm"
+            >
+              <option value="">Aucun</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
         <button
           type="submit"
           disabled={pending}
-          className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-xs py-1 px-2 rounded-lg"
+          className="col-span-2 sm:col-span-3 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-xs py-1.5 px-2 rounded-lg"
         >
           Mettre à jour
         </button>

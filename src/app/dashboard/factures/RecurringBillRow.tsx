@@ -33,6 +33,13 @@ function isPaidThisMonth(lastPaidAt: Date | null) {
   return paid.getFullYear() === now.getFullYear() && paid.getMonth() === now.getMonth();
 }
 
+// La date d'échéance passe automatiquement au mois suivant une fois le jour dépassé (calculée à
+// la volée, rien à stocker) : sert à savoir si on doit "Marquer" en avance ou "Valider" un
+// prélèvement/versement déjà censé avoir eu lieu, pour en suivre la bonne exécution.
+function isOverdue(dueDayOfMonth: number) {
+  return new Date().getDate() > dueDayOfMonth;
+}
+
 export function RecurringBillRow({
   bill,
   categories,
@@ -49,6 +56,7 @@ export function RecurringBillRow({
   const [kind, setKind] = useState<"EXPENSE" | "INCOME">(bill.kind as "EXPENSE" | "INCOME");
   const paid = isPaidThisMonth(bill.lastPaidAt);
   const isIncome = bill.kind === "INCOME";
+  const overdue = !paid && isOverdue(bill.dueDayOfMonth);
 
   const filteredCategories = categories.filter((c) => c.kind === kind);
 
@@ -78,6 +86,7 @@ export function RecurringBillRow({
             {paid && (
               <span className="text-emerald-400"> · {isIncome ? "Reçu" : "Payée"} ce mois-ci</span>
             )}
+            {overdue && <span className="text-amber-400"> · échéance dépassée, à valider</span>}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -92,11 +101,13 @@ export function RecurringBillRow({
               className={`text-xs font-medium rounded-lg px-2 py-1 border transition disabled:opacity-50 ${
                 paid
                   ? "text-emerald-400 border-emerald-800 hover:text-red-400 hover:border-red-800"
-                  : "text-white bg-green-600 hover:bg-green-700 border-green-600"
+                  : overdue
+                    ? "text-white bg-amber-600 hover:bg-amber-700 border-amber-600"
+                    : "text-white bg-green-600 hover:bg-green-700 border-green-600"
               }`}
-              title={paid ? "Cliquer pour annuler" : undefined}
+              title={paid ? "Cliquer pour annuler" : overdue ? "Confirmer que le prélèvement/versement a bien eu lieu" : undefined}
             >
-              {paying ? "..." : paid ? "✓ Annuler" : isIncome ? "Marquer reçu" : "Marquer payée"}
+              {paying ? "..." : paid ? "✓ Annuler" : overdue ? "Valider" : isIncome ? "Marquer reçu" : "Marquer payée"}
             </button>
           )}
           <button
