@@ -19,12 +19,19 @@ export default async function DashboardPage() {
       select: { amount: true },
     }),
     prisma.savingsGoal.findMany({ where: { householdId }, orderBy: { createdAt: "asc" }, take: 3 }),
-    prisma.recurringBill.findMany({ where: { householdId, isActive: true } }),
+    prisma.recurringBill.findMany({
+      where: { householdId, isActive: true },
+      include: { account: true },
+    }),
   ]);
 
   const totalBalance = accounts.reduce((s, a) => s + a.currentBalance, 0);
   const totalPlanned = budgets.reduce((s, b) => s + b.plannedAmount, 0);
   const totalSpent = spentThisMonth.reduce((s, t) => s + t.amount, 0);
+
+  // Une couleur stable par compte (basée sur sa position), pour les badges de la section factures.
+  const ACCOUNT_COLORS = ["#22c55e", "#0ea5e9", "#f59e0b", "#a78bfa", "#f43f5e", "#38bdf8"];
+  const accountColor = new Map(accounts.map((a, i) => [a.id, ACCOUNT_COLORS[i % ACCOUNT_COLORS.length]]));
 
   const upcomingBills = bills
     .map((b) => {
@@ -109,10 +116,27 @@ export default async function DashboardPage() {
             {upcomingBills.map((b) => (
               <div
                 key={b.id}
-                className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 flex items-center justify-between"
+                className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 flex items-center justify-between gap-3"
               >
-                <span>{b.label}</span>
-                <span className="text-slate-400 text-sm">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="truncate">{b.label}</span>
+                  {b.account && (
+                    <span
+                      className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium"
+                      style={{
+                        backgroundColor: `${accountColor.get(b.account.id)}22`,
+                        color: accountColor.get(b.account.id),
+                      }}
+                    >
+                      <span
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: accountColor.get(b.account.id) }}
+                      />
+                      {b.account.name}
+                    </span>
+                  )}
+                </div>
+                <span className="text-slate-400 text-sm shrink-0">
                   {b.amount.toFixed(2)} € · dans {b.daysUntil} j.
                 </span>
               </div>
