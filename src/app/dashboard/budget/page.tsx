@@ -140,8 +140,11 @@ export default async function BudgetPage({
       spent: acc.spent + r.spent,
       spentPrev: acc.spentPrev + r.spentPrev,
       planned: acc.planned + (r.budget?.plannedAmount ?? 0),
+      // Dépenses dans des catégories sans objectif défini : à part du total "spent" pour ne pas
+      // fausser la comparaison au global "planned" (qui ne couvre que les catégories budgétées).
+      unplanned: acc.unplanned + (r.budget ? 0 : r.spent),
     }),
-    { spent: 0, spentPrev: 0, planned: 0 }
+    { spent: 0, spentPrev: 0, planned: 0, unplanned: 0 }
   );
 
   const totalIncome = incomeTransactions.reduce((s, t) => s + t.amount, 0);
@@ -232,7 +235,7 @@ export default async function BudgetPage({
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
         <p className="text-xs text-slate-400 mb-3 capitalize">{monthLabel} vs {prevMonthLabel}</p>
         <div className="grid sm:grid-cols-2 gap-6 items-center">
-          <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
             <div>
               <p className="text-xs text-slate-500 mb-1 capitalize">{prevMonthLabel}</p>
               <p className="text-lg font-semibold text-slate-300">{totals.spentPrev.toFixed(2)} €</p>
@@ -251,6 +254,12 @@ export default async function BudgetPage({
               <p className="text-xs text-slate-500 mb-1">Objectif</p>
               <p className="text-lg font-semibold text-slate-300">
                 {totals.planned > 0 ? `${totals.planned.toFixed(2)} €` : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 mb-1">Hors budget</p>
+              <p className={`text-lg font-semibold ${totals.unplanned > 0 ? "text-amber-400" : "text-slate-300"}`}>
+                {totals.unplanned.toFixed(2)} €
               </p>
             </div>
           </div>
@@ -319,6 +328,7 @@ export default async function BudgetPage({
                 <span className={over ? "text-red-400" : "text-slate-300"}>
                   {spent.toFixed(2)} € {planned > 0 && `/ ${planned.toFixed(2)} € (objectif)`}
                 </span>
+                {planned === 0 && spent > 0 && <span className="text-xs text-amber-400">hors budget</span>}
                 {isInherited && planned > 0 && (
                   <span className="text-xs text-slate-500">
                     reporté depuis {budget!.month.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
