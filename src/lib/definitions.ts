@@ -139,11 +139,18 @@ export const SavingsGoalFormSchema = z.object({
     .positive({ error: "Le montant cible doit être positif." }),
   currentAmount: z.coerce.number().min(0).optional(),
   targetDate: z.string().trim().nullish(),
+  monthlyContribution: z.coerce.number().min(0).optional(),
 });
 
 export type SavingsGoalFormState =
   | {
-      errors?: { name?: string[]; targetAmount?: string[]; currentAmount?: string[]; targetDate?: string[] };
+      errors?: {
+        name?: string[];
+        targetAmount?: string[];
+        currentAmount?: string[];
+        targetDate?: string[];
+        monthlyContribution?: string[];
+      };
       message?: string;
       success?: boolean;
     }
@@ -173,6 +180,22 @@ export type RecurringBillFormState =
         categoryId?: string[];
         accountId?: string[];
       };
+      message?: string;
+      success?: boolean;
+    }
+  | undefined;
+
+export const OneOffPurchaseFormSchema = z.object({
+  label: z.string().trim().min(1, { error: "Le nom de l'achat est requis." }),
+  amount: z.coerce
+    .number({ error: "Le montant est requis." })
+    .positive({ error: "Le montant doit être positif." }),
+  occasion: z.string().trim().nullish(),
+});
+
+export type OneOffPurchaseFormState =
+  | {
+      errors?: { label?: string[]; amount?: string[]; occasion?: string[] };
       message?: string;
       success?: boolean;
     }

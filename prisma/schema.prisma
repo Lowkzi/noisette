@@ -48,6 +48,7 @@ model Household {
   savingsGoals   SavingsGoal[]
   recurringBills RecurringBill[]
   invites        HouseholdInvite[]
+  oneOffPurchases OneOffPurchase[]
 }
 
 model User {
@@ -181,6 +182,8 @@ model SavingsGoal {
   targetAmount  Float
   currentAmount Float     @default(0)
   targetDate    DateTime?
+  // Versement mensuel prévu vers cet objectif, pour projeter un montant annuel (mensuel × 12).
+  monthlyContribution Float?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -203,6 +206,21 @@ model RecurringBill {
   // Date du dernier prélèvement confirmé (bouton "Marquer comme payée"), pour éviter
   // un double décompte du même mois et savoir si l'échéance en cours est déjà réglée.
   lastPaidAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Dépense ponctuelle hors cycle mensuel récurrent (ex. cadeaux de Noël, achat exceptionnel),
+// regroupée librement par "occasion" (ex. "Cadeaux Noël") pour lister un budget dédié.
+model OneOffPurchase {
+  id          String    @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  label       String
+  amount      Float
+  occasion    String?
+  isBought    Boolean   @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

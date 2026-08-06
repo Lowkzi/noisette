@@ -17,13 +17,14 @@ export async function createSavingsGoal(
     targetAmount: formData.get("targetAmount"),
     currentAmount: formData.get("currentAmount"),
     targetDate: formData.get("targetDate"),
+    monthlyContribution: formData.get("monthlyContribution"),
   });
 
   if (!validatedFields.success) {
     return { errors: validatedFields.error.flatten().fieldErrors };
   }
 
-  const { name, targetAmount, currentAmount, targetDate } = validatedFields.data;
+  const { name, targetAmount, currentAmount, targetDate, monthlyContribution } = validatedFields.data;
 
   await prisma.savingsGoal.create({
     data: {
@@ -32,6 +33,7 @@ export async function createSavingsGoal(
       targetAmount,
       currentAmount: currentAmount ?? 0,
       targetDate: targetDate ? new Date(targetDate) : null,
+      monthlyContribution: monthlyContribution || null,
     },
   });
 
@@ -47,9 +49,13 @@ export async function updateSavingsGoalAmount(goalId: string, formData: FormData
   const currentAmount = Number(formData.get("currentAmount"));
   if (Number.isNaN(currentAmount) || currentAmount < 0) return;
 
+  const rawMonthly = formData.get("monthlyContribution");
+  const monthlyContribution = rawMonthly !== null && rawMonthly !== "" ? Number(rawMonthly) : null;
+  if (monthlyContribution !== null && (Number.isNaN(monthlyContribution) || monthlyContribution < 0)) return;
+
   await prisma.savingsGoal.updateMany({
     where: { id: goalId, householdId },
-    data: { currentAmount },
+    data: { currentAmount, monthlyContribution },
   });
 
   revalidatePath("/dashboard/epargne");

@@ -3,12 +3,26 @@ import { getHouseholdId } from "@/lib/dal";
 import { BudgetForm } from "./BudgetForm";
 import { DeleteBudgetButton } from "./DeleteBudgetButton";
 import { MonthPicker } from "./MonthPicker";
+import { WeeklyBreakdown } from "./WeeklyBreakdown";
 
 function sumByCategory(transactions: { amount: number; categoryId: string | null }[]) {
   const map = new Map<string, number>();
   for (const t of transactions) {
     if (!t.categoryId) continue;
     map.set(t.categoryId, (map.get(t.categoryId) ?? 0) + t.amount);
+  }
+  return map;
+}
+
+// Regroupe les dépenses d'une catégorie par semaine calendaire du mois (semaine 1 = jours 1-7, etc).
+function weeklyTotalsByCategory(transactions: { amount: number; categoryId: string | null; date: Date }[]) {
+  const map = new Map<string, number[]>();
+  for (const t of transactions) {
+    if (!t.categoryId) continue;
+    const week = Math.min(4, Math.floor((t.date.getDate() - 1) / 7));
+    const weeks = map.get(t.categoryId) ?? [0, 0, 0, 0, 0];
+    weeks[week] += t.amount;
+    map.set(t.categoryId, weeks);
   }
   return map;
 }
@@ -38,7 +52,7 @@ export default async function BudgetPage({
     }),
     prisma.transaction.findMany({
       where: { householdId, type: { in: ["EXPENSE", "DIRECT_DEBIT"] }, date: { gte: monthStart, lt: monthEnd } },
-      select: { amount: true, categoryId: true },
+      select: { amount: true, categoryId: true, date: true },
     }),
     prisma.transaction.findMany({
       where: {
@@ -52,6 +66,7 @@ export default async function BudgetPage({
 
   const spentByCategory = sumByCategory(transactions);
   const spentByCategoryPrev = sumByCategory(prevTransactions);
+  const weeklyByCategory = weeklyTotalsByCategory(transactions);
   const budgetByCategory = new Map(budgets.map((b) => [b.categoryId, b]));
 
   // Uniquement les catégories avec une activité ce mois-ci, le mois précédent, ou un objectif défini.
@@ -142,6 +157,7 @@ export default async function BudgetPage({
                   <div className={`h-full ${over ? "bg-red-500" : "bg-green-500"}`} style={{ width: `${pct}%` }} />
                 </div>
               )}
+              <WeeklyBreakdown weeks={weeklyByCategory.get(category.id) ?? [0, 0, 0, 0, 0]} />
               {budget && (
                 <div className="flex justify-end">
                   <DeleteBudgetButton budgetId={budget.id} />

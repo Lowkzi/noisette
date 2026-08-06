@@ -9,7 +9,7 @@ export function SavingsGoalForm() {
   return (
     <form action={action} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-3">
       <h2 className="font-semibold">Nouvel objectif d&apos;épargne</h2>
-      <div className="grid sm:grid-cols-4 gap-3">
+      <div className="grid sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <div>
           <label className="block text-xs text-slate-400 mb-1">Nom</label>
           <input
@@ -47,6 +47,17 @@ export function SavingsGoalForm() {
           <input
             name="targetDate"
             type="date"
+            className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Versement mensuel (optionnel)</label>
+          <input
+            name="monthlyContribution"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="ex. 100"
             className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
         </div>

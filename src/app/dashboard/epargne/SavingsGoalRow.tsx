@@ -9,6 +9,7 @@ type Goal = {
   targetAmount: number;
   currentAmount: number;
   targetDate: string | null;
+  monthlyContribution: number | null;
 };
 
 export function SavingsGoalRow({ goal }: { goal: Goal }) {
@@ -23,6 +24,11 @@ export function SavingsGoalRow({ goal }: { goal: Goal }) {
           {goal.targetDate && (
             <p className="text-xs text-slate-400">
               Échéance : {new Date(goal.targetDate).toLocaleDateString("fr-FR")}
+            </p>
+          )}
+          {goal.monthlyContribution && goal.monthlyContribution > 0 && (
+            <p className="text-xs text-sky-400">
+              {goal.monthlyContribution.toFixed(2)} €/mois · {(goal.monthlyContribution * 12).toFixed(2)} €/an projeté
             </p>
           )}
         </div>
@@ -58,6 +64,15 @@ export function SavingsGoalRow({ goal }: { goal: Goal }) {
           step="0.01"
           min="0"
           defaultValue={goal.currentAmount}
+          className="w-24 rounded-lg bg-slate-800 border border-slate-700 px-2 py-1 text-sm"
+        />
+        <input
+          name="monthlyContribution"
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder="€/mois"
+          defaultValue={goal.monthlyContribution ?? ""}
           className="w-24 rounded-lg bg-slate-800 border border-slate-700 px-2 py-1 text-sm"
         />
         <button
