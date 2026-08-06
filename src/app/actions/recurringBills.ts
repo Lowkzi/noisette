@@ -164,19 +164,39 @@ export async function unmarkRecurringBillPaid(billId: string): Promise<{ error?:
   const bill = await prisma.recurringBill.findFirst({ where: { id: billId, householdId } });
   if (!bill) return { error: "Introuvable." };
 
-  const transaction = await prisma.transaction.findFirst({
+  let transaction = await prisma.transaction.findFirst({
     where: { sourceRecurringBillId: billId, householdId },
     orderBy: { date: "desc" },
   });
-  if (!transaction) return { error: "Aucune transaction associée à annuler." };
+
+  // Filet de sécurité pour les paiements marqués avant l'ajout du lien direct : on retrouve la
+  // transaction correspondante par ressemblance (compte, montant, type, libellé, mois de paiement).
+  if (!transaction && bill.accountId && bill.lastPaidAt) {
+    const paidAt = new Date(bill.lastPaidAt);
+    const monthStart = new Date(paidAt.getFullYear(), paidAt.getMonth(), 1);
+    const monthEnd = new Date(paidAt.getFullYear(), paidAt.getMonth() + 1, 1);
+    transaction = await prisma.transaction.findFirst({
+      where: {
+        householdId,
+        accountId: bill.accountId,
+        amount: bill.amount,
+        label: bill.label,
+        type: bill.kind === "INCOME" ? "INCOME" : "DIRECT_DEBIT",
+        date: { gte: monthStart, lt: monthEnd },
+      },
+      orderBy: { date: "desc" },
+    });
+  }
 
   await prisma.$transaction(async (tx) => {
-    await applyBalanceEffect(
-      tx,
-      { accountId: transaction.accountId, toAccountId: transaction.toAccountId, amount: transaction.amount, type: transaction.type },
-      -1
-    );
-    await tx.transaction.delete({ where: { id: transaction.id } });
+    if (transaction) {
+      await applyBalanceEffect(
+        tx,
+        { accountId: transaction.accountId, toAccountId: transaction.toAccountId, amount: transaction.amount, type: transaction.type },
+        -1
+      );
+      await tx.transaction.delete({ where: { id: transaction.id } });
+    }
     await tx.recurringBill.update({ where: { id: billId }, data: { lastPaidAt: null } });
   });
 
@@ -185,6 +205,13 @@ export async function unmarkRecurringBillPaid(billId: string): Promise<{ error?:
   revalidatePath("/dashboard/transactions");
   revalidatePath("/dashboard/comptes");
   revalidatePath("/dashboard/budget");
+
+  if (!transaction) {
+    return {
+      error:
+        "Statut « payée » annulé. Aucune transaction correspondante n'a été retrouvée automatiquement (paiement antérieur à cette fonctionnalité) — vérifie le solde du compte et supprime-la manuellement si besoin.",
+    };
+  }
   return {};
 }
 
