@@ -98,6 +98,7 @@ model Account {
   transfersReceived Transaction[] @relation("TransferDestination")
   recurringBills RecurringBill[]
   budgets Budget[]
+  cushionGoals SavingsGoal[]
   // Membres affiliés, uniquement pertinent pour les comptes joints (ownership = JOINT).
   members User[] @relation("AccountMembers")
 }
@@ -133,6 +134,12 @@ model Transaction {
 
   categoryId  String?
   category    Category?       @relation(fields: [categoryId], references: [id])
+
+  // Renseigné quand cette transaction a été générée par "Marquer comme payée/reçue" sur une
+  // facture récurrente, pour pouvoir annuler ce marquage proprement (supprimer la transaction,
+  // restaurer le solde, effacer lastPaidAt).
+  sourceRecurringBillId String?
+  sourceRecurringBill   RecurringBill? @relation(fields: [sourceRecurringBillId], references: [id], onDelete: SetNull)
 
   amount      Float           // Toujours positif ; le signe est donné par `type`
   date        DateTime
@@ -208,6 +215,13 @@ model SavingsGoal {
   // Versement mensuel prévu vers cet objectif, pour projeter un montant annuel (mensuel × 12).
   monthlyContribution Float?
 
+  // Coussin financier : objectif rattaché à un compte précis, où targetAmount devient un seuil
+  // plancher. Une alerte se déclenche automatiquement si le solde réel du compte passe en dessous,
+  // sans mise à jour manuelle de currentAmount (le solde live du compte fait foi).
+  isCushion Boolean  @default(false)
+  accountId String?
+  account   Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -234,6 +248,8 @@ model RecurringBill {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  generatedTransactions Transaction[]
 }
 
 // Dépense ponctuelle hors cycle mensuel récurrent (ex. cadeaux de Noël, achat exceptionnel),

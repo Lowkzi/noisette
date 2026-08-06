@@ -6,6 +6,7 @@ import {
   deleteRecurringBill,
   updateRecurringBill,
   payRecurringBill,
+  unmarkRecurringBillPaid,
 } from "@/app/actions/recurringBills";
 
 type Category = { id: string; name: string; kind: string };
@@ -58,6 +59,13 @@ export function RecurringBillRow({
     if (result.error) alert(result.error);
   }
 
+  async function handleUnmark() {
+    setPaying(true);
+    const result = await unmarkRecurringBillPaid(bill.id);
+    setPaying(false);
+    if (result.error) alert(result.error);
+  }
+
   if (!editing) {
     return (
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 flex items-center justify-between">
@@ -79,15 +87,16 @@ export function RecurringBillRow({
           </p>
           {bill.isActive && (
             <button
-              onClick={handlePay}
-              disabled={paying || paid}
-              className={`text-xs font-medium rounded-lg px-2 py-1 border transition ${
+              onClick={paid ? handleUnmark : handlePay}
+              disabled={paying}
+              className={`text-xs font-medium rounded-lg px-2 py-1 border transition disabled:opacity-50 ${
                 paid
-                  ? "text-emerald-400 border-emerald-800 cursor-default"
-                  : "text-white bg-green-600 hover:bg-green-700 border-green-600 disabled:opacity-50"
+                  ? "text-emerald-400 border-emerald-800 hover:text-red-400 hover:border-red-800"
+                  : "text-white bg-green-600 hover:bg-green-700 border-green-600"
               }`}
+              title={paid ? "Cliquer pour annuler" : undefined}
             >
-              {paid ? "✓" : paying ? "..." : isIncome ? "Marquer reçu" : "Marquer payée"}
+              {paying ? "..." : paid ? "✓ Annuler" : isIncome ? "Marquer reçu" : "Marquer payée"}
             </button>
           )}
           <button

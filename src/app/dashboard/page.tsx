@@ -19,7 +19,7 @@ export default async function DashboardPage() {
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const today = now.getDate();
 
-  const [accounts, budgets, expenseTransactionsThisMonth, savingsGoals, bills] = await Promise.all([
+  const [accounts, budgets, expenseTransactionsThisMonth, savingsGoals, cushions, bills] = await Promise.all([
     prisma.account.findMany({ where: { householdId } }),
     // Tous les objectifs jusqu'à ce mois inclus (report automatique par compte + catégorie),
     // pour construire les rappels d'objectifs affichés sur le tableau de bord.
@@ -33,6 +33,7 @@ export default async function DashboardPage() {
       select: { amount: true, accountId: true, categoryId: true },
     }),
     prisma.savingsGoal.findMany({ where: { householdId }, orderBy: { createdAt: "asc" }, take: 3 }),
+    prisma.savingsGoal.findMany({ where: { householdId, isCushion: true }, include: { account: true } }),
     prisma.recurringBill.findMany({
       where: { householdId, isActive: true },
       include: { account: true },
@@ -91,6 +92,8 @@ export default async function DashboardPage() {
     );
   }
 
+  const cushionsBelow = cushions.filter((g) => g.account && g.account.currentBalance < g.targetAmount);
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -103,6 +106,18 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
+      {cushionsBelow.length > 0 && (
+        <div className="bg-red-950/30 border border-red-800 rounded-xl p-4 space-y-1">
+          <p className="text-sm font-semibold text-red-400">⚠️ Coussin financier entamé</p>
+          {cushionsBelow.map((g) => (
+            <p key={g.id} className="text-sm text-red-300">
+              {g.account!.name} : {g.account!.currentBalance.toFixed(2)} € (sous le seuil de{" "}
+              {g.targetAmount.toFixed(2)} €)
+            </p>
+          ))}
+        </div>
+      )}
+
       <div className="grid sm:grid-cols-3 gap-4">
         <Link
           href="/dashboard/comptes"
@@ -112,7 +127,18 @@ export default async function DashboardPage() {
           <p className={`text-2xl font-bold ${totalBalance < 0 ? "text-red-400" : "text-emerald-400"}`}>
             {totalBalance.toFixed(2)} €
           </p>
-          <p className="text-xs text-slate-500 mt-1">{accounts.length} compte(s)</p>
+          {accounts.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-slate-700 space-y-1">
+              {accounts.map((a) => (
+                <div key={a.id} className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400 truncate">{a.name}</span>
+                  <span className={a.currentBalance < 0 ? "text-red-400" : "text-slate-300"}>
+                    {a.currentBalance.toFixed(2)} €
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </Link>
 
         <Link
@@ -211,11 +237,7 @@ export default async function DashboardPage() {
                   <span className="text-slate-400 text-sm">
                     {b.amount.toFixed(2)} € · dans {b.daysUntil} j.
                   </span>
-                  {isPaidThisMonth(b.lastPaidAt) ? (
-                    <span className="text-xs text-emerald-400">Payée ✓</span>
-                  ) : (
-                    b.accountId && <PayBillButton billId={b.id} />
-                  )}
+                  {b.accountId && <PayBillButton billId={b.id} paid={isPaidThisMonth(b.lastPaidAt)} />}
                 </div>
               </div>
             ))}
@@ -224,7 +246,20 @@ export default async function DashboardPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-semibold">Objectifs d&apos;épargne</h2>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h2 className="font-semibold">Objectifs d&apos;épargne</h2>
+          {totalPlanned > 0 && (
+            <span
+              className={`text-xs font-medium px-2 py-1 rounded-full ${
+                totalSpent > totalPlanned ? "bg-red-500/15 text-red-400" : "bg-green-500/15 text-green-400"
+              }`}
+            >
+              {totalSpent > totalPlanned
+                ? `Budget dépassé de ${(totalSpent - totalPlanned).toFixed(2)} €`
+                : `Budget respecté (reste ${(totalPlanned - totalSpent).toFixed(2)} €)`}
+            </span>
+          )}
+        </div>
         {savingsGoals.length === 0 ? (
           <p className="text-slate-500 text-sm">Aucun objectif pour l&apos;instant.</p>
         ) : (

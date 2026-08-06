@@ -144,15 +144,22 @@ export type BudgetFormState =
     }
   | undefined;
 
-export const SavingsGoalFormSchema = z.object({
-  name: z.string().trim().min(1, { error: "Le nom de l'objectif est requis." }),
-  targetAmount: z.coerce
-    .number({ error: "Le montant cible est requis." })
-    .positive({ error: "Le montant cible doit être positif." }),
-  currentAmount: z.coerce.number().min(0).optional(),
-  targetDate: z.string().trim().nullish(),
-  monthlyContribution: z.coerce.number().min(0).optional(),
-});
+export const SavingsGoalFormSchema = z
+  .object({
+    name: z.string().trim().min(1, { error: "Le nom de l'objectif est requis." }),
+    targetAmount: z.coerce
+      .number({ error: "Le montant cible est requis." })
+      .positive({ error: "Le montant cible doit être positif." }),
+    currentAmount: z.coerce.number().min(0).optional(),
+    targetDate: z.string().trim().nullish(),
+    monthlyContribution: z.coerce.number().min(0).optional(),
+    isCushion: z.coerce.boolean().optional(),
+    accountId: z.string().trim().nullish(),
+  })
+  .refine((data) => !data.isCushion || !!data.accountId, {
+    error: "Merci de choisir le compte à surveiller pour ce coussin financier.",
+    path: ["accountId"],
+  });
 
 export type SavingsGoalFormState =
   | {
@@ -162,6 +169,7 @@ export type SavingsGoalFormState =
         currentAmount?: string[];
         targetDate?: string[];
         monthlyContribution?: string[];
+        accountId?: string[];
       };
       message?: string;
       success?: boolean;

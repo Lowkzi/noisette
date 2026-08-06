@@ -18,22 +18,32 @@ export async function createSavingsGoal(
     currentAmount: formData.get("currentAmount"),
     targetDate: formData.get("targetDate"),
     monthlyContribution: formData.get("monthlyContribution"),
+    isCushion: formData.get("isCushion"),
+    accountId: formData.get("accountId"),
   });
 
   if (!validatedFields.success) {
     return { errors: validatedFields.error.flatten().fieldErrors };
   }
 
-  const { name, targetAmount, currentAmount, targetDate, monthlyContribution } = validatedFields.data;
+  const { name, targetAmount, currentAmount, targetDate, monthlyContribution, isCushion, accountId } =
+    validatedFields.data;
+
+  if (isCushion) {
+    const account = await prisma.account.findFirst({ where: { id: accountId!, householdId } });
+    if (!account) return { errors: { accountId: ["Compte introuvable."] } };
+  }
 
   await prisma.savingsGoal.create({
     data: {
       householdId,
       name,
       targetAmount,
-      currentAmount: currentAmount ?? 0,
+      currentAmount: isCushion ? 0 : currentAmount ?? 0,
       targetDate: targetDate ? new Date(targetDate) : null,
       monthlyContribution: monthlyContribution || null,
+      isCushion: !!isCushion,
+      accountId: isCushion ? accountId : null,
     },
   });
 

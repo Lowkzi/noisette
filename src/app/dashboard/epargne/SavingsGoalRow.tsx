@@ -10,10 +10,53 @@ type Goal = {
   currentAmount: number;
   targetDate: string | null;
   monthlyContribution: number | null;
+  isCushion: boolean;
+  account: { id: string; name: string; currentBalance: number } | null;
 };
 
 export function SavingsGoalRow({ goal }: { goal: Goal }) {
   const [pending, setPending] = useState(false);
+
+  if (goal.isCushion && goal.account) {
+    const balance = goal.account.currentBalance;
+    const below = balance < goal.targetAmount;
+    const pct = goal.targetAmount > 0 ? Math.min(100, (balance / goal.targetAmount) * 100) : 100;
+
+    return (
+      <div
+        className={`border rounded-xl p-4 space-y-2 ${
+          below ? "bg-red-950/30 border-red-800" : "bg-slate-800/50 border-slate-700"
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-medium flex items-center gap-1.5">
+              {below && <span>⚠️</span>} {goal.name}
+            </p>
+            <p className="text-xs text-slate-400">Coussin financier · {goal.account.name}</p>
+          </div>
+          <button
+            onClick={async () => {
+              setPending(true);
+              await deleteSavingsGoal(goal.id);
+              setPending(false);
+            }}
+            disabled={pending}
+            className="text-xs text-red-400 hover:text-red-300"
+          >
+            Supprimer
+          </button>
+        </div>
+        <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
+          <div className={`h-full ${below ? "bg-red-500" : "bg-green-500"}`} style={{ width: `${pct}%` }} />
+        </div>
+        <p className={`text-sm ${below ? "text-red-400 font-medium" : "text-slate-400"}`}>
+          {balance.toFixed(2)} € {below ? "— en dessous du seuil de" : "/ seuil"} {goal.targetAmount.toFixed(2)} €
+        </p>
+      </div>
+    );
+  }
+
   const pct = goal.targetAmount > 0 ? Math.min(100, (goal.currentAmount / goal.targetAmount) * 100) : 0;
 
   return (

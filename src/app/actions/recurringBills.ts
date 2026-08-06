@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getHouseholdId, getUser } from "@/lib/dal";
 import { RecurringBillFormSchema, RecurringBillFormState } from "@/lib/definitions";
+import { applyBalanceEffect } from "@/lib/balance";
 
 export async function createRecurringBill(
   state: RecurringBillFormState,
@@ -126,6 +127,7 @@ export async function payRecurringBill(billId: string): Promise<{ error?: string
   }
 
   const isIncome = bill.kind === "INCOME";
+  const type = isIncome ? "INCOME" : "DIRECT_DEBIT";
 
   await prisma.$transaction(async (tx) => {
     await tx.transaction.create({
@@ -136,15 +138,46 @@ export async function payRecurringBill(billId: string): Promise<{ error?: string
         amount: bill.amount,
         date: now,
         label: bill.label,
-        type: isIncome ? "INCOME" : "DIRECT_DEBIT",
+        type,
         createdById: user.id,
+        sourceRecurringBillId: billId,
       },
     });
-    await tx.account.update({
-      where: { id: bill.accountId! },
-      data: { currentBalance: isIncome ? { increment: bill.amount } : { decrement: bill.amount } },
-    });
+    await applyBalanceEffect(tx, { accountId: bill.accountId!, toAccountId: null, amount: bill.amount, type }, 1);
     await tx.recurringBill.update({ where: { id: billId }, data: { lastPaidAt: now } });
+  });
+
+  revalidatePath("/dashboard/factures");
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/transactions");
+  revalidatePath("/dashboard/comptes");
+  revalidatePath("/dashboard/budget");
+  return {};
+}
+
+// Annule un "Marquer comme payée/reçue" : supprime la transaction générée, restaure le solde,
+// et efface le statut "réglé ce mois-ci" pour permettre de le remarquer plus tard si besoin.
+export async function unmarkRecurringBillPaid(billId: string): Promise<{ error?: string }> {
+  const householdId = await getHouseholdId();
+  if (!householdId) return { error: "Foyer introuvable." };
+
+  const bill = await prisma.recurringBill.findFirst({ where: { id: billId, householdId } });
+  if (!bill) return { error: "Introuvable." };
+
+  const transaction = await prisma.transaction.findFirst({
+    where: { sourceRecurringBillId: billId, householdId },
+    orderBy: { date: "desc" },
+  });
+  if (!transaction) return { error: "Aucune transaction associée à annuler." };
+
+  await prisma.$transaction(async (tx) => {
+    await applyBalanceEffect(
+      tx,
+      { accountId: transaction.accountId, toAccountId: transaction.toAccountId, amount: transaction.amount, type: transaction.type },
+      -1
+    );
+    await tx.transaction.delete({ where: { id: transaction.id } });
+    await tx.recurringBill.update({ where: { id: billId }, data: { lastPaidAt: null } });
   });
 
   revalidatePath("/dashboard/factures");
