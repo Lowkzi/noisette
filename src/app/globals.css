@@ -23,6 +23,10 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  /* Le fond de l'app est sombre en permanence (bg-slate-900) : sans ceci, les contrôles natifs
+     (icône/popup de calendrier des <input type="date|month">, ...) restent stylés en clair par
+     défaut et deviennent quasi invisibles/inutilisables sur fond sombre. */
+  color-scheme: dark;
 }
 
 /* iOS Safari zoome automatiquement au focus sur un champ dont la taille de police est
