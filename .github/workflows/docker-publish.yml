@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
 
+# Un push plus récent annule les runs plus anciens encore en attente/en cours sur main,
+# pour qu'un build en retard ne puisse jamais écraser "latest" avec du code obsolète.
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
 
