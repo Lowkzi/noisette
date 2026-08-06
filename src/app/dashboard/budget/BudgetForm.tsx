@@ -10,7 +10,11 @@ export function BudgetForm({ categories, month }: { categories: Category[]; mont
 
   return (
     <form action={action} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-3">
-      <h2 className="font-semibold">Définir un budget</h2>
+      <h2 className="font-semibold">Définir un objectif</h2>
+      <p className="text-xs text-slate-400 -mt-2">
+        L&apos;objectif se reporte automatiquement les mois suivants. Choisis un mois précis pour
+        l&apos;ajuster à partir de cette date seulement.
+      </p>
       <div className="grid sm:grid-cols-3 gap-3">
         <div>
           <label className="block text-xs text-slate-400 mb-1">Catégorie</label>

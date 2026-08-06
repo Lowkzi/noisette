@@ -54,9 +54,13 @@ export default async function BudgetPage({
   const [categories, budgets, transactions, prevTransactions, incomeTransactions, incomeBills] =
     await Promise.all([
       prisma.category.findMany({ where: { householdId, kind: "EXPENSE" }, orderBy: { name: "asc" } }),
+      // Tous les objectifs définis jusqu'à ce mois inclus : le plus récent par catégorie fait foi
+      // pour ce mois (report automatique), sauf si un objectif a été explicitement défini pour ce
+      // mois précis, auquel cas il prime.
       prisma.budget.findMany({
-        where: { householdId, month: monthStart },
+        where: { householdId, month: { lte: monthStart } },
         include: { category: true },
+        orderBy: { month: "asc" },
       }),
       prisma.transaction.findMany({
         where: { householdId, type: { in: ["EXPENSE", "DIRECT_DEBIT"] }, date: { gte: monthStart, lt: monthEnd } },
@@ -82,16 +86,22 @@ export default async function BudgetPage({
   const spentByCategory = sumByCategory(transactions);
   const spentByCategoryPrev = sumByCategory(prevTransactions);
   const weeklyByCategory = weeklyTotalsByCategory(transactions);
+  // budgets est trié par mois croissant : le dernier de la liste pour une catégorie donnée est
+  // donc le plus récent applicable à ce mois (défini ce mois-ci, ou reporté d'un mois antérieur).
   const budgetByCategory = new Map(budgets.map((b) => [b.categoryId, b]));
 
   // Uniquement les catégories avec une activité ce mois-ci, le mois précédent, ou un objectif défini.
   const rows = categories
-    .map((c) => ({
-      category: c,
-      spent: spentByCategory.get(c.id) ?? 0,
-      spentPrev: spentByCategoryPrev.get(c.id) ?? 0,
-      budget: budgetByCategory.get(c.id) ?? null,
-    }))
+    .map((c) => {
+      const budget = budgetByCategory.get(c.id) ?? null;
+      return {
+        category: c,
+        spent: spentByCategory.get(c.id) ?? 0,
+        spentPrev: spentByCategoryPrev.get(c.id) ?? 0,
+        budget,
+        isInherited: !!budget && budget.month.getTime() !== monthStart.getTime(),
+      };
+    })
     .filter((r) => r.spent > 0 || r.spentPrev > 0 || r.budget);
 
   const totals = rows.reduce(
@@ -231,7 +241,7 @@ export default async function BudgetPage({
       <BudgetForm categories={categories} month={month} />
 
       <div className="space-y-3">
-        {rows.map(({ category, spent, spentPrev, budget }) => {
+        {rows.map(({ category, spent, spentPrev, budget, isInherited }) => {
           const planned = budget?.plannedAmount ?? 0;
           const pct = planned > 0 ? Math.min(100, (spent / planned) * 100) : 0;
           const over = planned > 0 && spent > planned;
@@ -251,10 +261,15 @@ export default async function BudgetPage({
                   )}
                 </div>
               </div>
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-sm flex-wrap gap-1">
                 <span className={over ? "text-red-400" : "text-slate-300"}>
                   {spent.toFixed(2)} € {planned > 0 && `/ ${planned.toFixed(2)} € (objectif)`}
                 </span>
+                {isInherited && planned > 0 && (
+                  <span className="text-xs text-slate-500">
+                    reporté depuis {budget!.month.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
+                  </span>
+                )}
               </div>
               {planned > 0 && (
                 <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
@@ -264,7 +279,10 @@ export default async function BudgetPage({
               <WeeklyBreakdown weeks={weeklyByCategory.get(category.id) ?? [0, 0, 0, 0, 0]} />
               {budget && (
                 <div className="flex justify-end">
-                  <DeleteBudgetButton budgetId={budget.id} />
+                  <DeleteBudgetButton
+                    budgetId={budget.id}
+                    label={isInherited ? "Arrêter cet objectif récurrent" : "Supprimer"}
+                  />
                 </div>
               )}
             </div>
