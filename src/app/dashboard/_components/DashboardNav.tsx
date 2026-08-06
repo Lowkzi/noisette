@@ -17,6 +17,7 @@ const PRIMARY_LINKS = [
 const MORE_LINKS = [
   { href: "/dashboard/epargne", label: "Épargne" },
   { href: "/dashboard/factures", label: "Factures récurrentes" },
+  { href: "/dashboard/categories", label: "Catégories" },
   { href: "/dashboard/rapports", label: "Rapports" },
   { href: "/dashboard/foyer", label: "Foyer" },
 ];

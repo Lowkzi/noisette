@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { getHouseholdId } from "@/lib/dal";
 import { TransactionForm } from "./TransactionForm";
 import { DeleteTransactionButton } from "./DeleteTransactionButton";
-import { CategoryQuickAdd } from "./CategoryQuickAdd";
 
 const TYPE_LABELS: Record<string, string> = {
   EXPENSE: "Dépense",
@@ -68,10 +67,6 @@ export default async function TransactionsPage({
         <TransactionForm accounts={accounts} categories={categories} members={members} />
       )}
 
-      <div className="bg-slate-800/30 border border-slate-800 rounded-xl p-4">
-        <CategoryQuickAdd categories={categories} />
-      </div>
-
       <form className="flex flex-wrap gap-3 items-end text-sm" method="get">
         <div>
           <label className="block text-xs text-slate-400 mb-1">Mois</label>
@@ -115,6 +110,9 @@ export default async function TransactionsPage({
         <button type="submit" className="bg-slate-700 hover:bg-slate-600 text-sm py-1.5 px-3 rounded-lg">
           Filtrer
         </button>
+        <Link href="/dashboard/categories" className="text-slate-400 hover:text-white text-sm py-1.5 transition">
+          Gérer les catégories →
+        </Link>
       </form>
 
       <div className="divide-y divide-slate-800 border border-slate-800 rounded-xl overflow-hidden">

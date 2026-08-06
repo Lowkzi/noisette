@@ -27,6 +27,7 @@ export async function createCategory(state: CategoryFormState, formData: FormDat
 
   revalidatePath("/dashboard/transactions");
   revalidatePath("/dashboard/budget");
+  revalidatePath("/dashboard/categories");
   return { success: true };
 }
 
@@ -38,4 +39,5 @@ export async function deleteCategory(categoryId: string) {
 
   revalidatePath("/dashboard/transactions");
   revalidatePath("/dashboard/budget");
+  revalidatePath("/dashboard/categories");
 }
