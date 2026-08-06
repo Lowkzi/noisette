@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { createAccount } from "@/app/actions/accounts";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -10,8 +10,18 @@ const TYPE_LABELS: Record<string, string> = {
   OTHER: "Autre",
 };
 
-export function AccountForm() {
+type Member = { id: string; name: string | null; email: string };
+
+export function AccountForm({ members }: { members: Member[] }) {
   const [state, action, pending] = useActionState(createAccount, undefined);
+  const [ownership, setOwnership] = useState<"INDIVIDUAL" | "JOINT">("INDIVIDUAL");
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+
+  const memberIdsJson = JSON.stringify(selectedMembers);
+
+  function toggleMember(id: string) {
+    setSelectedMembers((prev) => (prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]));
+  }
 
   return (
     <form action={action} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-3">
@@ -55,6 +65,51 @@ export function AccountForm() {
           )}
         </div>
       </div>
+
+      <div>
+        <label className="block text-xs text-slate-400 mb-1">Propriété</label>
+        <div className="flex gap-2">
+          {(["INDIVIDUAL", "JOINT"] as const).map((o) => (
+            <button
+              key={o}
+              type="button"
+              onClick={() => setOwnership(o)}
+              className={`flex-1 sm:flex-none sm:w-40 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                ownership === o
+                  ? "bg-green-600 text-white"
+                  : "bg-slate-800 border border-slate-700 text-slate-400 hover:text-white"
+              }`}
+            >
+              {o === "INDIVIDUAL" ? "Individuel" : "Joint"}
+            </button>
+          ))}
+          <input type="hidden" name="ownership" value={ownership} />
+        </div>
+      </div>
+
+      {ownership === "JOINT" && members.length > 0 && (
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Membres affiliés</label>
+          <div className="flex flex-wrap gap-2">
+            {members.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => toggleMember(m.id)}
+                className={`rounded-full px-3 py-1.5 text-sm transition ${
+                  selectedMembers.includes(m.id)
+                    ? "bg-sky-600 text-white"
+                    : "bg-slate-800 border border-slate-700 text-slate-400 hover:text-white"
+                }`}
+              >
+                {m.name ?? m.email}
+              </button>
+            ))}
+          </div>
+          <input type="hidden" name="memberIds" value={memberIdsJson} />
+        </div>
+      )}
+
       {state?.message && <p className="text-sm text-red-400">{state.message}</p>}
       <button
         disabled={pending}

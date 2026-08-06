@@ -6,12 +6,20 @@ import { DeleteAccountButton } from "./DeleteAccountButton";
 export default async function ComptesPage() {
   const householdId = await getHouseholdId();
 
-  const accounts = householdId
-    ? await prisma.account.findMany({
-        where: { householdId },
-        orderBy: { createdAt: "asc" },
-      })
-    : [];
+  const [accounts, members] = householdId
+    ? await Promise.all([
+        prisma.account.findMany({
+          where: { householdId },
+          include: { members: true },
+          orderBy: { createdAt: "asc" },
+        }),
+        prisma.user.findMany({
+          where: { householdId },
+          select: { id: true, name: true, email: true },
+          orderBy: { name: "asc" },
+        }),
+      ])
+    : [[], []];
 
   const total = accounts.reduce((sum, a) => sum + a.currentBalance, 0);
 
@@ -24,7 +32,7 @@ export default async function ComptesPage() {
         </span>
       </div>
 
-      <AccountForm />
+      <AccountForm members={members} />
 
       <div className="grid sm:grid-cols-2 gap-3">
         {accounts.map((account) => (
@@ -32,11 +40,27 @@ export default async function ComptesPage() {
             key={account.id}
             className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 flex items-center justify-between"
           >
-            <div>
-              <p className="font-semibold">{account.name}</p>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-semibold">{account.name}</p>
+                <span
+                  className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full ${
+                    account.ownership === "JOINT"
+                      ? "bg-sky-500/15 text-sky-400"
+                      : "bg-slate-700/50 text-slate-400"
+                  }`}
+                >
+                  {account.ownership === "JOINT" ? "Joint" : "Individuel"}
+                </span>
+              </div>
               <p className="text-xs text-slate-400">{TYPE_LABELS[account.type]}</p>
+              {account.ownership === "JOINT" && account.members.length > 0 && (
+                <p className="text-xs text-slate-500 mt-1">
+                  {account.members.map((m) => m.name ?? m.email).join(", ")}
+                </p>
+              )}
             </div>
-            <div className="text-right space-y-1">
+            <div className="text-right space-y-1 shrink-0">
               <p
                 className={`font-semibold ${account.currentBalance < 0 ? "text-red-400" : "text-emerald-400"}`}
               >

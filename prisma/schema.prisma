@@ -30,6 +30,11 @@ enum AccountType {
   OTHER
 }
 
+enum AccountOwnership {
+  INDIVIDUAL
+  JOINT
+}
+
 model Household {
   id        String   @id @default(cuid())
   name      String
@@ -62,6 +67,7 @@ model User {
   transactionsCreated Transaction[]     @relation("TransactionCreatedBy")
   transactionSplits    TransactionSplit[]
   invitesSent          HouseholdInvite[] @relation("InvitedBy")
+  jointAccounts        Account[]        @relation("AccountMembers")
 }
 
 model HouseholdInvite {
@@ -80,14 +86,17 @@ model Account {
   householdId    String
   household      Household   @relation(fields: [householdId], references: [id], onDelete: Cascade)
   name           String
-  type           AccountType @default(CHECKING)
-  currentBalance Float       @default(0)
+  type           AccountType      @default(CHECKING)
+  ownership      AccountOwnership @default(INDIVIDUAL)
+  currentBalance Float            @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   transactions Transaction[]
   recurringBills RecurringBill[]
+  // Membres affiliés, uniquement pertinent pour les comptes joints (ownership = JOINT).
+  members User[] @relation("AccountMembers")
 }
 
 model Category {
