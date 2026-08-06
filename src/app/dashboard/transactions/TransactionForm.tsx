@@ -27,7 +27,6 @@ export function TransactionForm({
   const [type, setType] = useState<"EXPENSE" | "INCOME" | "TRANSFER" | "DIRECT_DEBIT">("EXPENSE");
   const [isShared, setIsShared] = useState(false);
   const [shares, setShares] = useState<Record<string, string>>({});
-  const [showMore, setShowMore] = useState(false);
 
   const filteredCategories = categories.filter((c) =>
     type === "INCOME" ? c.kind === "INCOME" : c.kind === "EXPENSE"
@@ -38,8 +37,6 @@ export function TransactionForm({
       .filter(([, v]) => v && Number(v) > 0)
       .map(([userId, shareAmount]) => ({ userId, shareAmount: Number(shareAmount) }))
   );
-
-  const hasAdvancedContent = accounts.length > 1 || filteredCategories.length > 0 || members.length > 1;
 
   return (
     <form action={action} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-3">
@@ -96,109 +93,94 @@ export function TransactionForm({
         <input type="hidden" name="accountId" value={accounts[0].id} />
       )}
 
-      {hasAdvancedContent && (
-        <button
-          type="button"
-          onClick={() => setShowMore((v) => !v)}
-          className="text-xs text-slate-400 hover:text-white transition"
-        >
-          {showMore ? "− Moins d'options" : "+ Compte, catégorie, date, note..."}
-        </button>
-      )}
-
-      <div className={showMore ? "space-y-3" : "hidden"}>
-        <div className="grid sm:grid-cols-3 gap-3">
-          {accounts.length > 1 && (
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Compte</label>
-              <select
-                name="accountId"
-                required={accounts.length > 1}
-                className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-              {state?.errors?.accountId && (
-                <p className="text-xs text-red-400 mt-1">{state.errors.accountId[0]}</p>
-              )}
-            </div>
-          )}
-          {filteredCategories.length > 0 && (
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Catégorie</label>
-              <select
-                name="categoryId"
-                className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">—</option>
-                {filteredCategories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+      <div className="grid sm:grid-cols-3 gap-3">
+        {accounts.length > 1 && (
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Date</label>
-            <input
-              name="date"
-              type="date"
-              defaultValue={new Date().toISOString().slice(0, 10)}
+            <label className="block text-xs text-slate-400 mb-1">Compte</label>
+            <select
+              name="accountId"
               required
               className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Note (optionnel)</label>
-          <input
-            name="note"
-            className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
-        </div>
-
-        {members.length > 1 && (
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm text-slate-300">
-              <input
-                type="checkbox"
-                name="isShared"
-                checked={isShared}
-                onChange={(e) => setIsShared(e.target.checked)}
-              />
-              Dépense partagée entre membres du foyer
-            </label>
-            {isShared && (
-              <div className="grid sm:grid-cols-2 gap-2 bg-slate-900/50 rounded-lg p-3">
-                {members.map((m) => (
-                  <div key={m.id} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="text-slate-400">{m.name ?? m.email}</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={shares[m.id] ?? ""}
-                      onChange={(e) => setShares((s) => ({ ...s, [m.id]: e.target.value }))}
-                      className="w-24 rounded-lg bg-slate-800 border border-slate-700 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                  </div>
-                ))}
-                <input type="hidden" name="splits" value={splitsJson} />
-              </div>
+            >
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+            {state?.errors?.accountId && (
+              <p className="text-xs text-red-400 mt-1">{state.errors.accountId[0]}</p>
             )}
           </div>
         )}
+        {filteredCategories.length > 0 && (
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Catégorie</label>
+            <select
+              name="categoryId"
+              className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">—</option>
+              {filteredCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Date</label>
+          <input
+            name="date"
+            type="date"
+            defaultValue={new Date().toISOString().slice(0, 10)}
+            required
+            className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+        </div>
       </div>
 
-      {/* Si les options avancées sont cachées, on envoie quand même la date du jour par défaut */}
-      {!showMore && <input type="hidden" name="date" value={new Date().toISOString().slice(0, 10)} />}
+      <div>
+        <label className="block text-xs text-slate-400 mb-1">Note (optionnel)</label>
+        <input
+          name="note"
+          className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+        />
+      </div>
+
+      {members.length > 1 && (
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              name="isShared"
+              checked={isShared}
+              onChange={(e) => setIsShared(e.target.checked)}
+            />
+            Dépense partagée entre membres du foyer
+          </label>
+          {isShared && (
+            <div className="grid sm:grid-cols-2 gap-2 bg-slate-900/50 rounded-lg p-3">
+              {members.map((m) => (
+                <div key={m.id} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="text-slate-400">{m.name ?? m.email}</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={shares[m.id] ?? ""}
+                    onChange={(e) => setShares((s) => ({ ...s, [m.id]: e.target.value }))}
+                    className="w-24 rounded-lg bg-slate-800 border border-slate-700 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              ))}
+              <input type="hidden" name="splits" value={splitsJson} />
+            </div>
+          )}
+        </div>
+      )}
 
       {state?.message && <p className="text-sm text-red-400">{state.message}</p>}
       <button
