@@ -264,26 +264,38 @@ export default async function BudgetPage({
             </div>
           </div>
 
-          {pieSlices.length > 0 && pieSlices[0].total > 0 && (
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              <svg viewBox="0 0 200 200" className="w-32 h-32 shrink-0">
-                {pieSlices.map((s) => (
-                  <path key={s.name} d={s.path} fill={s.color} />
-                ))}
-              </svg>
-              <ul className="space-y-1 text-xs">
-                {pieSlices.map((s) => (
-                  <li key={s.name} className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-sm inline-block shrink-0" style={{ backgroundColor: s.color }} />
-                    <span className="text-slate-300">{s.name}</span>
-                    <span className="text-slate-500">
-                      {s.total > 0 ? ((s.amount / s.total) * 100).toFixed(0) : 0}%
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div>
+            <p className="text-xs text-slate-500 mb-2 sm:hidden">Répartition des dépenses</p>
+            {pieSlices.length > 0 && pieSlices[0].total > 0 ? (
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <svg viewBox="0 0 200 200" className="w-32 h-32 shrink-0">
+                  {pieSlices.map((s) => (
+                    <path key={s.name} d={s.path} fill={s.color} />
+                  ))}
+                </svg>
+                <ul className="space-y-1 text-xs">
+                  {pieSlices.map((s) => (
+                    <li key={s.name} className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm inline-block shrink-0" style={{ backgroundColor: s.color }} />
+                      <span className="text-slate-300">{s.name}</span>
+                      <span className="text-slate-500">
+                        {s.total > 0 ? ((s.amount / s.total) * 100).toFixed(0) : 0}%
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-center py-4">
+                <svg viewBox="0 0 200 200" className="w-24 h-24 shrink-0 opacity-30">
+                  <circle cx="100" cy="100" r="90" fill="none" stroke="currentColor" strokeWidth="12" className="text-slate-600" />
+                </svg>
+                <p className="text-xs text-slate-500">
+                  Le camembert apparaîtra dès qu&apos;une dépense sera enregistrée ce mois-ci.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
