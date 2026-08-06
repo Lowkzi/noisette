@@ -20,6 +20,7 @@ enum TransactionType {
   EXPENSE
   INCOME
   TRANSFER
+  DIRECT_DEBIT
 }
 
 enum AccountType {

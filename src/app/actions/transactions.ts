@@ -6,9 +6,9 @@ import { getUser, getHouseholdId } from "@/lib/dal";
 import { TransactionFormSchema, TransactionFormState } from "@/lib/definitions";
 
 // Applique la variation de solde d'un compte pour une transaction donnée (signe selon le type).
-function balanceDelta(amount: number, type: "EXPENSE" | "INCOME" | "TRANSFER") {
+function balanceDelta(amount: number, type: "EXPENSE" | "INCOME" | "TRANSFER" | "DIRECT_DEBIT") {
   if (type === "INCOME") return amount;
-  if (type === "EXPENSE") return -amount;
+  if (type === "EXPENSE" || type === "DIRECT_DEBIT") return -amount;
   return 0; // TRANSFER : V1 ne gère qu'un compte par transaction, pas de mouvement inter-comptes
 }
 

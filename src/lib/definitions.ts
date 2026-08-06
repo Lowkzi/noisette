@@ -77,7 +77,7 @@ export type CategoryFormState =
     }
   | undefined;
 
-export const TRANSACTION_TYPES = ["EXPENSE", "INCOME", "TRANSFER"] as const;
+export const TRANSACTION_TYPES = ["EXPENSE", "INCOME", "TRANSFER", "DIRECT_DEBIT"] as const;
 
 export const TransactionFormSchema = z.object({
   accountId: z.string().min(1, { error: "Merci de choisir un compte." }),

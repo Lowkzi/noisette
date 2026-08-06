@@ -8,6 +8,7 @@ const TYPE_LABELS: Record<string, string> = {
   EXPENSE: "Dépense",
   INCOME: "Revenu",
   TRANSFER: "Virement",
+  DIRECT_DEBIT: "Prélèvement",
 };
 
 export default async function TransactionsPage({
@@ -137,10 +138,14 @@ export default async function TransactionsPage({
             <div className="text-right shrink-0 space-y-1">
               <p
                 className={`font-semibold ${
-                  t.type === "INCOME" ? "text-emerald-400" : t.type === "EXPENSE" ? "text-red-400" : "text-slate-300"
+                  t.type === "INCOME"
+                    ? "text-emerald-400"
+                    : t.type === "EXPENSE" || t.type === "DIRECT_DEBIT"
+                      ? "text-red-400"
+                      : "text-slate-300"
                 }`}
               >
-                {t.type === "INCOME" ? "+" : t.type === "EXPENSE" ? "-" : ""}
+                {t.type === "INCOME" ? "+" : t.type === "EXPENSE" || t.type === "DIRECT_DEBIT" ? "-" : ""}
                 {t.amount.toFixed(2)} €
               </p>
               <DeleteTransactionButton transactionId={t.id} />

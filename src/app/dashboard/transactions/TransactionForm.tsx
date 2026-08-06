@@ -11,6 +11,7 @@ const TYPE_OPTIONS = [
   { value: "EXPENSE", label: "Dépense" },
   { value: "INCOME", label: "Revenu" },
   { value: "TRANSFER", label: "Virement" },
+  { value: "DIRECT_DEBIT", label: "Prélèvement" },
 ] as const;
 
 export function TransactionForm({
@@ -23,14 +24,14 @@ export function TransactionForm({
   members: Member[];
 }) {
   const [state, action, pending] = useActionState(createTransaction, undefined);
-  const [type, setType] = useState<"EXPENSE" | "INCOME" | "TRANSFER">("EXPENSE");
+  const [type, setType] = useState<"EXPENSE" | "INCOME" | "TRANSFER" | "DIRECT_DEBIT">("EXPENSE");
   const [isShared, setIsShared] = useState(false);
   const [shares, setShares] = useState<Record<string, string>>({});
   const [showMore, setShowMore] = useState(false);
 
   const filteredCategories = categories.filter((c) =>
     type === "INCOME" ? c.kind === "INCOME" : c.kind === "EXPENSE"
-  );
+  ); // DIRECT_DEBIT et TRANSFER se classent comme des dépenses côté catégories
 
   const splitsJson = JSON.stringify(
     Object.entries(shares)
@@ -45,13 +46,13 @@ export function TransactionForm({
       <h2 className="font-semibold">Ajouter une transaction</h2>
 
       {/* Type : boutons segmentés, plus rapides qu'un select pour un geste répété au quotidien */}
-      <div className="flex gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {TYPE_OPTIONS.map((opt) => (
           <button
             key={opt.value}
             type="button"
             onClick={() => setType(opt.value)}
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
               type === opt.value
                 ? "bg-green-600 text-white"
                 : "bg-slate-800 border border-slate-700 text-slate-400 hover:text-white"

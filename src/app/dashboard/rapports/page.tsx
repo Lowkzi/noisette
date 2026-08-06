@@ -24,7 +24,7 @@ export default async function RapportsPage() {
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
   const expenses = await prisma.transaction.findMany({
-    where: { householdId, type: "EXPENSE", date: { gte: monthStart, lt: monthEnd } },
+    where: { householdId, type: { in: ["EXPENSE", "DIRECT_DEBIT"] }, date: { gte: monthStart, lt: monthEnd } },
     include: { category: true },
   });
 
@@ -49,7 +49,7 @@ export default async function RapportsPage() {
   const recentTransactions = await prisma.transaction.findMany({
     where: {
       householdId,
-      type: { in: ["EXPENSE", "INCOME"] },
+      type: { in: ["EXPENSE", "INCOME", "DIRECT_DEBIT"] },
       date: { gte: sixMonthsAgo, lt: monthEnd },
     },
     select: { amount: true, type: true, date: true },
@@ -63,7 +63,7 @@ export default async function RapportsPage() {
       .filter((t) => t.type === "INCOME" && t.date >= d && t.date < nd)
       .reduce((s, t) => s + t.amount, 0);
     const expense = recentTransactions
-      .filter((t) => t.type === "EXPENSE" && t.date >= d && t.date < nd)
+      .filter((t) => (t.type === "EXPENSE" || t.type === "DIRECT_DEBIT") && t.date >= d && t.date < nd)
       .reduce((s, t) => s + t.amount, 0);
     monthly.push({ label: d.toLocaleDateString("fr-FR", { month: "short" }), income, expense });
   }

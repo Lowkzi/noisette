@@ -27,7 +27,7 @@ export default async function BudgetPage({
       include: { category: true },
     }),
     prisma.transaction.findMany({
-      where: { householdId, type: "EXPENSE", date: { gte: monthStart, lt: monthEnd } },
+      where: { householdId, type: { in: ["EXPENSE", "DIRECT_DEBIT"] }, date: { gte: monthStart, lt: monthEnd } },
       select: { amount: true, categoryId: true },
     }),
   ]);

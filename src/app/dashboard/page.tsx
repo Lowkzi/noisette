@@ -15,7 +15,7 @@ export default async function DashboardPage() {
     prisma.account.findMany({ where: { householdId } }),
     prisma.budget.findMany({ where: { householdId, month: monthStart } }),
     prisma.transaction.findMany({
-      where: { householdId, type: "EXPENSE", date: { gte: monthStart, lt: monthEnd } },
+      where: { householdId, type: { in: ["EXPENSE", "DIRECT_DEBIT"] }, date: { gte: monthStart, lt: monthEnd } },
       select: { amount: true },
     }),
     prisma.savingsGoal.findMany({ where: { householdId }, orderBy: { createdAt: "asc" }, take: 3 }),
