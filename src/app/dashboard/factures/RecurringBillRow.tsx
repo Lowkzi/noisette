@@ -9,6 +9,7 @@ type Bill = {
   dueDayOfMonth: number;
   isActive: boolean;
   category: { name: string } | null;
+  account: { name: string } | null;
 };
 
 export function RecurringBillRow({ bill }: { bill: Bill }) {
@@ -17,7 +18,9 @@ export function RecurringBillRow({ bill }: { bill: Bill }) {
       <div>
         <p className={`font-medium ${!bill.isActive ? "line-through text-slate-500" : ""}`}>{bill.label}</p>
         <p className="text-xs text-slate-400">
-          Le {bill.dueDayOfMonth} de chaque mois{bill.category ? ` · ${bill.category.name}` : ""}
+          Le {bill.dueDayOfMonth} de chaque mois
+          {bill.category ? ` · ${bill.category.name}` : ""}
+          {bill.account ? ` · ${bill.account.name}` : ""}
         </p>
       </div>
       <div className="flex items-center gap-3">

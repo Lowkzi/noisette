@@ -10,7 +10,7 @@ export default async function FacturesPage() {
   const [bills, categories, accounts] = await Promise.all([
     prisma.recurringBill.findMany({
       where: { householdId },
-      include: { category: true },
+      include: { category: true, account: true },
       orderBy: { dueDayOfMonth: "asc" },
     }),
     prisma.category.findMany({ where: { householdId }, orderBy: { name: "asc" } }),
