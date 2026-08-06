@@ -96,6 +96,7 @@ model Account {
 
   transactions Transaction[]
   recurringBills RecurringBill[]
+  budgets Budget[]
   // Membres affiliés, uniquement pertinent pour les comptes joints (ownership = JOINT).
   members User[] @relation("AccountMembers")
 }
@@ -157,21 +158,37 @@ model TransactionSplit {
   @@unique([transactionId, userId])
 }
 
-// Budget mensuel par catégorie. Le montant dépensé est calculé à la volée à partir des
-// Transaction du mois plutôt que dénormalisé ici.
+// Budget mensuel par catégorie ET par compte (un objectif n'a de sens que rapporté à un compte
+// précis, sinon les dépenses de plusieurs comptes s'agrègent sans distinction). Le montant dépensé
+// est calculé à la volée à partir des Transaction du mois plutôt que dénormalisé ici.
 model Budget {
   id             String   @id @default(cuid())
   householdId    String
   household      Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
   categoryId     String
   category       Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
   month          DateTime // Toujours le 1er du mois concerné
   plannedAmount  Float
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([categoryId, month])
+  weeks BudgetWeek[]
+
+  @@unique([categoryId, accountId, month])
+}
+
+// Répartition indicative de l'objectif mensuel par semaine calendaire (0 = semaine 1, ... 4 = semaine 5).
+model BudgetWeek {
+  id            String @id @default(cuid())
+  budgetId      String
+  budget        Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  weekIndex     Int
+  plannedAmount Float
+
+  @@unique([budgetId, weekIndex])
 }
 
 model SavingsGoal {

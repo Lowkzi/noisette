@@ -1,9 +1,10 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getHouseholdId } from "@/lib/dal";
 import { buildPieSlices } from "@/lib/pie";
 import { BudgetForm } from "./BudgetForm";
 import { DeleteBudgetButton } from "./DeleteBudgetButton";
-import { MonthPicker } from "./MonthPicker";
+import { BudgetFilters } from "./BudgetFilters";
 import { WeeklyBreakdown } from "./WeeklyBreakdown";
 
 function sumByCategory(transactions: { amount: number; categoryId: string | null }[]) {
@@ -36,12 +37,37 @@ function isReceivedThisMonth(lastPaidAt: Date | null, now: Date) {
 export default async function BudgetPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; accountId?: string }>;
 }) {
   const householdId = await getHouseholdId();
   const params = await searchParams;
 
   if (!householdId) return <p className="text-slate-500">Foyer introuvable.</p>;
+
+  const accounts = await prisma.account.findMany({ where: { householdId }, orderBy: { name: "asc" } });
+
+  if (accounts.length === 0) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-xl font-bold">Budget</h1>
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-2">
+          <p className="font-semibold">Ajoute d&apos;abord un compte</p>
+          <p className="text-sm text-slate-400">
+            Un objectif de budget est toujours rattaché à un compte précis.
+          </p>
+          <Link
+            href="/dashboard/comptes"
+            className="inline-block bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition"
+          >
+            Créer un compte
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const accountId = accounts.some((a) => a.id === params.accountId) ? params.accountId! : accounts[0].id;
+  const selectedAccount = accounts.find((a) => a.id === accountId)!;
 
   const now = new Date();
   const month = params.month ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -54,32 +80,37 @@ export default async function BudgetPage({
   const [categories, budgets, transactions, prevTransactions, incomeTransactions, incomeBills] =
     await Promise.all([
       prisma.category.findMany({ where: { householdId, kind: "EXPENSE" }, orderBy: { name: "asc" } }),
-      // Tous les objectifs définis jusqu'à ce mois inclus : le plus récent par catégorie fait foi
-      // pour ce mois (report automatique), sauf si un objectif a été explicitement défini pour ce
-      // mois précis, auquel cas il prime.
+      // Tous les objectifs définis jusqu'à ce mois inclus, pour ce compte : le plus récent par
+      // catégorie fait foi pour ce mois (report automatique), sauf override explicite sur ce mois.
       prisma.budget.findMany({
-        where: { householdId, month: { lte: monthStart } },
-        include: { category: true },
+        where: { householdId, accountId, month: { lte: monthStart } },
+        include: { category: true, weeks: true },
         orderBy: { month: "asc" },
       }),
       prisma.transaction.findMany({
-        where: { householdId, type: { in: ["EXPENSE", "DIRECT_DEBIT"] }, date: { gte: monthStart, lt: monthEnd } },
+        where: {
+          householdId,
+          accountId,
+          type: { in: ["EXPENSE", "DIRECT_DEBIT"] },
+          date: { gte: monthStart, lt: monthEnd },
+        },
         select: { amount: true, categoryId: true, date: true },
       }),
       prisma.transaction.findMany({
         where: {
           householdId,
+          accountId,
           type: { in: ["EXPENSE", "DIRECT_DEBIT"] },
           date: { gte: prevMonthStart, lt: monthStart },
         },
         select: { amount: true, categoryId: true },
       }),
       prisma.transaction.findMany({
-        where: { householdId, type: "INCOME", date: { gte: monthStart, lt: monthEnd } },
+        where: { householdId, accountId, type: "INCOME", date: { gte: monthStart, lt: monthEnd } },
         select: { amount: true, label: true },
       }),
       prisma.recurringBill.findMany({
-        where: { householdId, kind: "INCOME", isActive: true },
+        where: { householdId, accountId, kind: "INCOME", isActive: true },
       }),
     ]);
 
@@ -126,12 +157,21 @@ export default async function BudgetPage({
   const monthLabel = monthStart.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
   const prevMonthLabel = prevMonthStart.toLocaleDateString("fr-FR", { month: "long" });
 
+  // Aucun objectif défini pour ce compte, jamais (même dans un mois antérieur) : première
+  // utilisation, on invite explicitement à saisir les objectifs plutôt que de cacher le formulaire.
+  const hasAnyBudgetForAccount = await prisma.budget.count({ where: { householdId, accountId } });
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-bold">Budget</h1>
-        <MonthPicker month={month} />
+        <BudgetFilters month={month} accountId={accountId} accounts={accounts} />
       </div>
+      {accounts.length > 1 && (
+        <p className="text-xs text-slate-500 -mt-4">
+          Objectifs propres au compte <span className="text-slate-300">{selectedAccount.name}</span>.
+        </p>
+      )}
 
       {/* Entrées / Sorties d'argent, comme le récapitulatif en tête de l'ancien fichier Excel. */}
       <div className="grid sm:grid-cols-2 gap-4">
@@ -238,7 +278,17 @@ export default async function BudgetPage({
         </div>
       </div>
 
-      <BudgetForm categories={categories} month={month} />
+      {hasAnyBudgetForAccount === 0 ? (
+        <div className="space-y-2">
+          <p className="text-sm text-slate-300">
+            Aucun objectif défini pour <span className="font-medium">{selectedAccount.name}</span> — indique
+            combien tu comptes dépenser dans chaque catégorie ce mois-ci.
+          </p>
+          <BudgetForm categories={categories} accounts={accounts} month={month} defaultAccountId={accountId} invite />
+        </div>
+      ) : (
+        <BudgetForm categories={categories} accounts={accounts} month={month} defaultAccountId={accountId} />
+      )}
 
       <div className="space-y-3">
         {rows.map(({ category, spent, spentPrev, budget, isInherited }) => {
@@ -247,6 +297,10 @@ export default async function BudgetPage({
           const over = planned > 0 && spent > planned;
           const deltaPct = spentPrev > 0 ? ((spent - spentPrev) / spentPrev) * 100 : spent > 0 ? 100 : 0;
           const deltaUp = spent > spentPrev;
+          const plannedWeeks = [0, 0, 0, 0, 0];
+          if (budget) {
+            for (const w of budget.weeks) plannedWeeks[w.weekIndex] = w.plannedAmount;
+          }
 
           return (
             <div key={category.id} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-2">
@@ -276,7 +330,11 @@ export default async function BudgetPage({
                   <div className={`h-full ${over ? "bg-red-500" : "bg-green-500"}`} style={{ width: `${pct}%` }} />
                 </div>
               )}
-              <WeeklyBreakdown weeks={weeklyByCategory.get(category.id) ?? [0, 0, 0, 0, 0]} />
+              <WeeklyBreakdown
+                weeks={weeklyByCategory.get(category.id) ?? [0, 0, 0, 0, 0]}
+                plannedWeeks={plannedWeeks}
+                budgetId={budget?.id ?? null}
+              />
               {budget && (
                 <div className="flex justify-end">
                   <DeleteBudgetButton

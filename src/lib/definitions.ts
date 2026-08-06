@@ -118,6 +118,7 @@ export type TransactionFormState =
 
 export const BudgetFormSchema = z.object({
   categoryId: z.string().min(1, { error: "Merci de choisir une catégorie." }),
+  accountId: z.string().min(1, { error: "Merci de choisir un compte." }),
   month: z.string().min(1, { error: "Le mois est requis." }),
   plannedAmount: z.coerce
     .number({ error: "Le montant est requis." })
@@ -126,7 +127,7 @@ export const BudgetFormSchema = z.object({
 
 export type BudgetFormState =
   | {
-      errors?: { categoryId?: string[]; month?: string[]; plannedAmount?: string[] };
+      errors?: { categoryId?: string[]; accountId?: string[]; month?: string[]; plannedAmount?: string[] };
       message?: string;
       success?: boolean;
     }
