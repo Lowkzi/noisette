@@ -95,6 +95,7 @@ model Account {
   updatedAt DateTime @updatedAt
 
   transactions Transaction[]
+  transfersReceived Transaction[] @relation("TransferDestination")
   recurringBills RecurringBill[]
   budgets Budget[]
   // Membres affiliés, uniquement pertinent pour les comptes joints (ownership = JOINT).
@@ -124,6 +125,11 @@ model Transaction {
 
   accountId   String
   account     Account         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // Uniquement pour type = TRANSFER : compte de destination du virement (accountId reste le
+  // compte débité). Le solde de toAccount est crédité du même montant.
+  toAccountId String?
+  toAccount   Account?        @relation("TransferDestination", fields: [toAccountId], references: [id])
 
   categoryId  String?
   category    Category?       @relation(fields: [categoryId], references: [id])

@@ -83,26 +83,37 @@ export type CategoryFormState =
 
 export const TRANSACTION_TYPES = ["EXPENSE", "INCOME", "TRANSFER", "DIRECT_DEBIT"] as const;
 
-export const TransactionFormSchema = z.object({
-  accountId: z.string().min(1, { error: "Merci de choisir un compte." }),
-  categoryId: z.string().trim().nullish(),
-  amount: z.coerce
-    .number({ error: "Le montant est requis." })
-    .positive({ error: "Le montant doit être positif." }),
-  date: z.string().min(1, { error: "La date est requise." }),
-  label: z.string().trim().min(1, { error: "Le libellé est requis." }),
-  note: z.string().trim().nullish(),
-  type: z.enum(TRANSACTION_TYPES, { error: "Type invalide." }),
-  isShared: z.coerce.boolean().optional(),
-  // Chaîne JSON de { userId, shareAmount }[], champ caché rempli par le client uniquement
-  // quand isShared est coché — absent du DOM sinon, d'où le .nullish().
-  splits: z.string().nullish(),
-});
+export const TransactionFormSchema = z
+  .object({
+    accountId: z.string().min(1, { error: "Merci de choisir un compte." }),
+    toAccountId: z.string().trim().nullish(),
+    categoryId: z.string().trim().nullish(),
+    amount: z.coerce
+      .number({ error: "Le montant est requis." })
+      .positive({ error: "Le montant doit être positif." }),
+    date: z.string().min(1, { error: "La date est requise." }),
+    label: z.string().trim().min(1, { error: "Le libellé est requis." }),
+    note: z.string().trim().nullish(),
+    type: z.enum(TRANSACTION_TYPES, { error: "Type invalide." }),
+    isShared: z.coerce.boolean().optional(),
+    // Chaîne JSON de { userId, shareAmount }[], champ caché rempli par le client uniquement
+    // quand isShared est coché — absent du DOM sinon, d'où le .nullish().
+    splits: z.string().nullish(),
+  })
+  .refine((data) => data.type !== "TRANSFER" || !!data.toAccountId, {
+    error: "Merci de choisir le compte de destination du virement.",
+    path: ["toAccountId"],
+  })
+  .refine((data) => data.type !== "TRANSFER" || data.toAccountId !== data.accountId, {
+    error: "Le compte de destination doit être différent du compte débité.",
+    path: ["toAccountId"],
+  });
 
 export type TransactionFormState =
   | {
       errors?: {
         accountId?: string[];
+        toAccountId?: string[];
         categoryId?: string[];
         amount?: string[];
         date?: string[];

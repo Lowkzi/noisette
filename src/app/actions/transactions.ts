@@ -5,11 +5,32 @@ import { prisma } from "@/lib/prisma";
 import { getUser, getHouseholdId } from "@/lib/dal";
 import { TransactionFormSchema, TransactionFormState } from "@/lib/definitions";
 
-// Applique la variation de solde d'un compte pour une transaction donnée (signe selon le type).
-function balanceDelta(amount: number, type: "EXPENSE" | "INCOME" | "TRANSFER" | "DIRECT_DEBIT") {
-  if (type === "INCOME") return amount;
-  if (type === "EXPENSE" || type === "DIRECT_DEBIT") return -amount;
-  return 0; // TRANSFER : V1 ne gère qu'un compte par transaction, pas de mouvement inter-comptes
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+// Applique (sign = 1) ou annule (sign = -1) l'effet d'une transaction sur le(s) solde(s) de
+// compte(s) concerné(s). Un virement (TRANSFER) débite accountId et crédite toAccountId du même
+// montant ; les autres types ne touchent que accountId.
+async function applyBalanceEffect(
+  tx: TxClient,
+  entry: { accountId: string; toAccountId: string | null; amount: number; type: string },
+  sign: 1 | -1
+) {
+  if (entry.type === "TRANSFER" && entry.toAccountId) {
+    await tx.account.update({
+      where: { id: entry.accountId },
+      data: { currentBalance: { increment: -sign * entry.amount } },
+    });
+    await tx.account.update({
+      where: { id: entry.toAccountId },
+      data: { currentBalance: { increment: sign * entry.amount } },
+    });
+    return;
+  }
+  const delta = entry.type === "INCOME" ? entry.amount : entry.type === "TRANSFER" ? 0 : -entry.amount;
+  await tx.account.update({
+    where: { id: entry.accountId },
+    data: { currentBalance: { increment: sign * delta } },
+  });
 }
 
 export async function createTransaction(
@@ -22,6 +43,7 @@ export async function createTransaction(
 
   const validatedFields = TransactionFormSchema.safeParse({
     accountId: formData.get("accountId"),
+    toAccountId: formData.get("toAccountId"),
     categoryId: formData.get("categoryId"),
     amount: formData.get("amount"),
     date: formData.get("date"),
@@ -36,11 +58,18 @@ export async function createTransaction(
     return { errors: validatedFields.error.flatten().fieldErrors };
   }
 
-  const { accountId, categoryId, amount, date, label, note, type, isShared, splits } =
+  const { accountId, toAccountId, categoryId, amount, date, label, note, type, isShared, splits } =
     validatedFields.data;
 
   const account = await prisma.account.findFirst({ where: { id: accountId, householdId } });
   if (!account) return { message: "Compte introuvable." };
+
+  let resolvedToAccountId: string | null = null;
+  if (type === "TRANSFER") {
+    const toAccount = await prisma.account.findFirst({ where: { id: toAccountId!, householdId } });
+    if (!toAccount) return { errors: { toAccountId: ["Compte de destination introuvable."] } };
+    resolvedToAccountId = toAccount.id;
+  }
 
   let parsedSplits: { userId: string; shareAmount: number }[] = [];
   if (isShared && splits) {
@@ -56,7 +85,8 @@ export async function createTransaction(
       data: {
         householdId,
         accountId,
-        categoryId: categoryId || null,
+        toAccountId: resolvedToAccountId,
+        categoryId: type === "TRANSFER" ? null : categoryId || null,
         amount,
         date: new Date(date),
         label,
@@ -70,10 +100,7 @@ export async function createTransaction(
       },
     });
 
-    await tx.account.update({
-      where: { id: accountId },
-      data: { currentBalance: { increment: balanceDelta(amount, type) } },
-    });
+    await applyBalanceEffect(tx, { accountId, toAccountId: resolvedToAccountId, amount, type }, 1);
   });
 
   revalidatePath("/dashboard/transactions");
@@ -96,6 +123,7 @@ export async function updateTransaction(
 
   const validatedFields = TransactionFormSchema.safeParse({
     accountId: formData.get("accountId"),
+    toAccountId: formData.get("toAccountId"),
     categoryId: formData.get("categoryId"),
     amount: formData.get("amount"),
     date: formData.get("date"),
@@ -110,11 +138,18 @@ export async function updateTransaction(
     return { errors: validatedFields.error.flatten().fieldErrors };
   }
 
-  const { accountId, categoryId, amount, date, label, note, type, isShared, splits } =
+  const { accountId, toAccountId, categoryId, amount, date, label, note, type, isShared, splits } =
     validatedFields.data;
 
   const account = await prisma.account.findFirst({ where: { id: accountId, householdId } });
   if (!account) return { message: "Compte introuvable." };
+
+  let resolvedToAccountId: string | null = null;
+  if (type === "TRANSFER") {
+    const toAccount = await prisma.account.findFirst({ where: { id: toAccountId!, householdId } });
+    if (!toAccount) return { errors: { toAccountId: ["Compte de destination introuvable."] } };
+    resolvedToAccountId = toAccount.id;
+  }
 
   // Le formulaire d'édition rapide ne gère pas le partage entre membres : quand ni "isShared"
   // ni "splits" ne sont soumis, on préserve la répartition existante plutôt que de l'effacer.
@@ -133,11 +168,12 @@ export async function updateTransaction(
   }
 
   await prisma.$transaction(async (tx) => {
-    // Annule l'effet de l'ancienne transaction sur le solde de son compte d'origine.
-    await tx.account.update({
-      where: { id: existing.accountId },
-      data: { currentBalance: { increment: -balanceDelta(existing.amount, existing.type) } },
-    });
+    // Annule l'effet de l'ancienne version sur le(s) solde(s) d'origine.
+    await applyBalanceEffect(
+      tx,
+      { accountId: existing.accountId, toAccountId: existing.toAccountId, amount: existing.amount, type: existing.type },
+      -1
+    );
 
     if (sharedFieldsProvided) {
       await tx.transactionSplit.deleteMany({ where: { transactionId } });
@@ -146,7 +182,8 @@ export async function updateTransaction(
       where: { id: transactionId },
       data: {
         accountId,
-        categoryId: categoryId || null,
+        toAccountId: resolvedToAccountId,
+        categoryId: type === "TRANSFER" ? null : categoryId || null,
         amount,
         date: new Date(date),
         label,
@@ -164,11 +201,8 @@ export async function updateTransaction(
       },
     });
 
-    // Applique l'effet de la nouvelle version sur le solde du compte (éventuellement différent).
-    await tx.account.update({
-      where: { id: accountId },
-      data: { currentBalance: { increment: balanceDelta(amount, type) } },
-    });
+    // Applique l'effet de la nouvelle version (compte(s) éventuellement différent(s)).
+    await applyBalanceEffect(tx, { accountId, toAccountId: resolvedToAccountId, amount, type }, 1);
   });
 
   revalidatePath("/dashboard/transactions");
@@ -189,14 +223,11 @@ export async function deleteTransaction(transactionId: string) {
 
   await prisma.$transaction(async (tx) => {
     await tx.transaction.delete({ where: { id: transactionId } });
-    await tx.account.update({
-      where: { id: transaction.accountId },
-      data: {
-        currentBalance: {
-          increment: -balanceDelta(transaction.amount, transaction.type),
-        },
-      },
-    });
+    await applyBalanceEffect(
+      tx,
+      { accountId: transaction.accountId, toAccountId: transaction.toAccountId, amount: transaction.amount, type: transaction.type },
+      -1
+    );
   });
 
   revalidatePath("/dashboard/transactions");

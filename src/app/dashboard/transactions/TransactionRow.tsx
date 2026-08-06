@@ -23,8 +23,10 @@ type Transaction = {
   type: string;
   isShared: boolean;
   accountId: string;
+  toAccountId: string | null;
   categoryId: string | null;
   account: Account;
+  toAccount: Account | null;
   category: { id: string; name: string } | null;
   splits: Split[];
 };
@@ -42,10 +44,12 @@ export function TransactionRow({
   const boundUpdate = updateTransaction.bind(null, t.id);
   const [state, action, pending] = useActionState(boundUpdate, undefined);
   const [type, setType] = useState(t.type);
+  const [accountId, setAccountId] = useState(t.accountId);
 
   const filteredCategories = categories.filter((c) =>
     type === "INCOME" ? c.kind === "INCOME" : c.kind === "EXPENSE"
   );
+  const destinationAccounts = accounts.filter((a) => a.id !== accountId);
 
   if (!editing) {
     return (
@@ -54,6 +58,7 @@ export function TransactionRow({
           <p className="font-medium truncate">{t.label}</p>
           <p className="text-xs text-slate-400">
             {new Date(t.date).toLocaleDateString("fr-FR")} · {t.account.name}
+            {t.type === "TRANSFER" && t.toAccount ? ` → ${t.toAccount.name}` : ""}
             {t.category ? ` · ${t.category.name}` : ""} · {TYPE_LABELS[t.type]}
             {t.isShared && t.splits.length > 0 && (
               <>
@@ -133,10 +138,13 @@ export function TransactionRow({
           {state?.errors?.label && <p className="text-xs text-red-400 mt-1">{state.errors.label[0]}</p>}
         </div>
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Compte</label>
+          <label className="block text-xs text-slate-400 mb-1">
+            {type === "TRANSFER" ? "Compte débité" : "Compte"}
+          </label>
           <select
             name="accountId"
-            defaultValue={t.accountId}
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
             required
             className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           >
@@ -147,21 +155,42 @@ export function TransactionRow({
             ))}
           </select>
         </div>
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Catégorie</label>
-          <select
-            name="categoryId"
-            defaultValue={t.categoryId ?? ""}
-            className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          >
-            <option value="">—</option>
-            {filteredCategories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {type === "TRANSFER" ? (
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Compte crédité</label>
+            <select
+              name="toAccountId"
+              defaultValue={t.toAccountId ?? ""}
+              required
+              className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              {destinationAccounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+            {state?.errors?.toAccountId && (
+              <p className="text-xs text-red-400 mt-1">{state.errors.toAccountId[0]}</p>
+            )}
+          </div>
+        ) : (
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Catégorie</label>
+            <select
+              name="categoryId"
+              defaultValue={t.categoryId ?? ""}
+              className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">—</option>
+              {filteredCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3">

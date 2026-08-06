@@ -25,12 +25,15 @@ export function TransactionForm({
 }) {
   const [state, action, pending] = useActionState(createTransaction, undefined);
   const [type, setType] = useState<"EXPENSE" | "INCOME" | "TRANSFER" | "DIRECT_DEBIT">("EXPENSE");
+  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [isShared, setIsShared] = useState(false);
   const [shares, setShares] = useState<Record<string, string>>({});
 
   const filteredCategories = categories.filter((c) =>
     type === "INCOME" ? c.kind === "INCOME" : c.kind === "EXPENSE"
-  ); // DIRECT_DEBIT et TRANSFER se classent comme des dépenses côté catégories
+  ); // DIRECT_DEBIT se classe comme une dépense côté catégories ; TRANSFER n'a pas de catégorie
+
+  const destinationAccounts = accounts.filter((a) => a.id !== accountId);
 
   const splitsJson = JSON.stringify(
     Object.entries(shares)
@@ -81,7 +84,7 @@ export function TransactionForm({
           <input
             name="label"
             required
-            placeholder="Courses, essence..."
+            placeholder={type === "TRANSFER" ? "Virement épargne..." : "Courses, essence..."}
             className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           {state?.errors?.label && <p className="text-xs text-red-400 mt-1">{state.errors.label[0]}</p>}
@@ -96,10 +99,14 @@ export function TransactionForm({
       <div className="grid sm:grid-cols-3 gap-3">
         {accounts.length > 1 && (
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Compte</label>
+            <label className="block text-xs text-slate-400 mb-1">
+              {type === "TRANSFER" ? "Compte débité" : "Compte"}
+            </label>
             <select
               name="accountId"
               required
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
               className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               {accounts.map((a) => (
@@ -113,22 +120,44 @@ export function TransactionForm({
             )}
           </div>
         )}
-        {filteredCategories.length > 0 && (
+
+        {type === "TRANSFER" ? (
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Catégorie</label>
+            <label className="block text-xs text-slate-400 mb-1">Compte crédité</label>
             <select
-              name="categoryId"
+              name="toAccountId"
+              required
               className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
             >
-              <option value="">—</option>
-              {filteredCategories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
+              {destinationAccounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
                 </option>
               ))}
             </select>
+            {state?.errors?.toAccountId && (
+              <p className="text-xs text-red-400 mt-1">{state.errors.toAccountId[0]}</p>
+            )}
           </div>
+        ) : (
+          filteredCategories.length > 0 && (
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Catégorie</label>
+              <select
+                name="categoryId"
+                className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="">—</option>
+                {filteredCategories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )
         )}
+
         <div>
           <label className="block text-xs text-slate-400 mb-1">Date</label>
           <input
@@ -149,7 +178,7 @@ export function TransactionForm({
         />
       </div>
 
-      {members.length > 1 && (
+      {type !== "TRANSFER" && members.length > 1 && (
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm text-slate-300">
             <input
@@ -182,9 +211,13 @@ export function TransactionForm({
         </div>
       )}
 
+      {type === "TRANSFER" && accounts.length < 2 && (
+        <p className="text-sm text-amber-400">Il faut au moins deux comptes pour faire un virement.</p>
+      )}
+
       {state?.message && <p className="text-sm text-red-400">{state.message}</p>}
       <button
-        disabled={pending}
+        disabled={pending || (type === "TRANSFER" && accounts.length < 2)}
         type="submit"
         className="w-full sm:w-auto bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold py-2 px-6 rounded-lg transition"
       >

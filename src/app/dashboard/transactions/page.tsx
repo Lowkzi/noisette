@@ -35,7 +35,7 @@ export default async function TransactionsPage({
       ...(params.accountId ? { accountId: params.accountId } : {}),
       ...(params.categoryId ? { categoryId: params.categoryId } : {}),
     },
-    include: { account: true, category: true, splits: { include: { user: true } } },
+    include: { account: true, toAccount: true, category: true, splits: { include: { user: true } } },
     orderBy: { date: "desc" },
   });
 
