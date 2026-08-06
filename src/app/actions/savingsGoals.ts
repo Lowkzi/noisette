@@ -29,8 +29,8 @@ export async function createSavingsGoal(
   const { name, targetAmount, currentAmount, targetDate, monthlyContribution, isCushion, accountId } =
     validatedFields.data;
 
-  if (isCushion) {
-    const account = await prisma.account.findFirst({ where: { id: accountId!, householdId } });
+  if (accountId) {
+    const account = await prisma.account.findFirst({ where: { id: accountId, householdId } });
     if (!account) return { errors: { accountId: ["Compte introuvable."] } };
   }
 
@@ -43,7 +43,7 @@ export async function createSavingsGoal(
       targetDate: targetDate ? new Date(targetDate) : null,
       monthlyContribution: monthlyContribution || null,
       isCushion: !!isCushion,
-      accountId: isCushion ? accountId : null,
+      accountId: accountId || null,
     },
   });
 
@@ -63,9 +63,16 @@ export async function updateSavingsGoalAmount(goalId: string, formData: FormData
   const monthlyContribution = rawMonthly !== null && rawMonthly !== "" ? Number(rawMonthly) : null;
   if (monthlyContribution !== null && (Number.isNaN(monthlyContribution) || monthlyContribution < 0)) return;
 
+  const rawAccountId = formData.get("accountId");
+  const accountId = typeof rawAccountId === "string" && rawAccountId ? rawAccountId : null;
+  if (accountId) {
+    const account = await prisma.account.findFirst({ where: { id: accountId, householdId } });
+    if (!account) return;
+  }
+
   await prisma.savingsGoal.updateMany({
     where: { id: goalId, householdId },
-    data: { currentAmount, monthlyContribution },
+    data: { currentAmount, monthlyContribution, accountId },
   });
 
   revalidatePath("/dashboard/epargne");

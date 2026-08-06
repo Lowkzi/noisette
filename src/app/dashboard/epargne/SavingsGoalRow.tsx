@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { updateSavingsGoalAmount, deleteSavingsGoal } from "@/app/actions/savingsGoals";
 
+type Account = { id: string; name: string };
 type Goal = {
   id: string;
   name: string;
@@ -14,7 +15,7 @@ type Goal = {
   account: { id: string; name: string; currentBalance: number } | null;
 };
 
-export function SavingsGoalRow({ goal }: { goal: Goal }) {
+export function SavingsGoalRow({ goal, accounts }: { goal: Goal; accounts: Account[] }) {
   const [pending, setPending] = useState(false);
 
   if (goal.isCushion && goal.account) {
@@ -74,6 +75,7 @@ export function SavingsGoalRow({ goal }: { goal: Goal }) {
               {goal.monthlyContribution.toFixed(2)} €/mois · {(goal.monthlyContribution * 12).toFixed(2)} €/an projeté
             </p>
           )}
+          {goal.account && <p className="text-xs text-slate-500">Stocké sur : {goal.account.name}</p>}
         </div>
         <button
           onClick={async () => {
@@ -118,6 +120,20 @@ export function SavingsGoalRow({ goal }: { goal: Goal }) {
           defaultValue={goal.monthlyContribution ?? ""}
           className="w-24 rounded-lg bg-slate-800 border border-slate-700 px-2 py-1 text-sm"
         />
+        {accounts.length > 0 && (
+          <select
+            name="accountId"
+            defaultValue={goal.account?.id ?? ""}
+            className="rounded-lg bg-slate-800 border border-slate-700 px-2 py-1 text-sm"
+          >
+            <option value="">Aucun compte</option>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        )}
         <button
           type="submit"
           disabled={pending}

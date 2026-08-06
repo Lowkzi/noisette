@@ -103,6 +103,23 @@ export function SavingsGoalForm({ accounts }: { accounts: Account[] }) {
                 className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
+            {accounts.length > 0 && (
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Compte où c&apos;est stocké (optionnel)</label>
+                <select
+                  name="accountId"
+                  defaultValue=""
+                  className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="">—</option>
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </>
         )}
       </div>

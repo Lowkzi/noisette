@@ -50,6 +50,7 @@ export default async function EpargnePage() {
           <SavingsGoalRow
             key={goal.id}
             goal={{ ...goal, targetDate: goal.targetDate ? goal.targetDate.toISOString() : null }}
+            accounts={accounts}
           />
         ))}
         {goals.length === 0 && <p className="text-slate-500 text-sm">Aucun objectif pour l&apos;instant.</p>}
