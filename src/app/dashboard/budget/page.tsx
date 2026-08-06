@@ -77,7 +77,7 @@ export default async function BudgetPage({
   const prevMonthStart = new Date(year, monthNum - 2, 1);
   const isCurrentMonth = now >= monthStart && now < monthEnd;
 
-  const [categories, budgets, transactions, prevTransactions, incomeTransactions, incomeBills] =
+  const [categories, budgets, transactions, prevTransactions, incomeTransactions, incomeBills, expenseBills] =
     await Promise.all([
       prisma.category.findMany({ where: { householdId, kind: "EXPENSE" }, orderBy: { name: "asc" } }),
       // Tous les objectifs définis jusqu'à ce mois inclus, pour ce compte : le plus récent par
@@ -112,6 +112,9 @@ export default async function BudgetPage({
       prisma.recurringBill.findMany({
         where: { householdId, accountId, kind: "INCOME", isActive: true },
       }),
+      prisma.recurringBill.findMany({
+        where: { householdId, accountId, kind: "EXPENSE", isActive: true },
+      }),
     ]);
 
   const spentByCategory = sumByCategory(transactions);
@@ -121,13 +124,29 @@ export default async function BudgetPage({
   // donc le plus récent applicable à ce mois (défini ce mois-ci, ou reporté d'un mois antérieur).
   const budgetByCategory = new Map(budgets.map((b) => [b.categoryId, b]));
 
-  // Uniquement les catégories avec une activité ce mois-ci, le mois précédent, ou un objectif défini.
+  // Frais fixes (factures récurrentes) pas encore marqués payés ce mois-ci : ils comptent comme
+  // engagés dans le calcul de la catégorie, même avant l'enregistrement de la transaction réelle.
+  const committedExpenseBills = isCurrentMonth
+    ? expenseBills.filter((b) => !isReceivedThisMonth(b.lastPaidAt, now))
+    : [];
+  const committedByCategory = new Map<string, number>();
+  for (const b of committedExpenseBills) {
+    if (!b.categoryId) continue;
+    committedByCategory.set(b.categoryId, (committedByCategory.get(b.categoryId) ?? 0) + b.amount);
+  }
+
+  // Uniquement les catégories avec une activité ce mois-ci, le mois précédent, un objectif défini,
+  // ou un frais fixe engagé.
   const rows = categories
     .map((c) => {
       const budget = budgetByCategory.get(c.id) ?? null;
+      const actual = spentByCategory.get(c.id) ?? 0;
+      const committed = committedByCategory.get(c.id) ?? 0;
       return {
         category: c,
-        spent: spentByCategory.get(c.id) ?? 0,
+        actual,
+        committed,
+        spent: actual + committed,
         spentPrev: spentByCategoryPrev.get(c.id) ?? 0,
         budget,
         isInherited: !!budget && budget.month.getTime() !== monthStart.getTime(),
@@ -140,11 +159,12 @@ export default async function BudgetPage({
       spent: acc.spent + r.spent,
       spentPrev: acc.spentPrev + r.spentPrev,
       planned: acc.planned + (r.budget?.plannedAmount ?? 0),
+      committed: acc.committed + r.committed,
       // Dépenses dans des catégories sans objectif défini : à part du total "spent" pour ne pas
       // fausser la comparaison au global "planned" (qui ne couvre que les catégories budgétées).
       unplanned: acc.unplanned + (r.budget ? 0 : r.spent),
     }),
-    { spent: 0, spentPrev: 0, planned: 0, unplanned: 0 }
+    { spent: 0, spentPrev: 0, planned: 0, committed: 0, unplanned: 0 }
   );
 
   const totalIncome = incomeTransactions.reduce((s, t) => s + t.amount, 0);
@@ -210,9 +230,12 @@ export default async function BudgetPage({
             <p className="text-sm text-slate-500">Aucune dépense ce mois-ci.</p>
           ) : (
             <div className="space-y-1 text-sm">
-              {rows.map(({ category, spent }) => (
+              {rows.map(({ category, spent, committed }) => (
                 <div key={category.id} className="flex items-center justify-between text-slate-300">
-                  <span>{category.name}</span>
+                  <span>
+                    {category.name}
+                    {committed > 0 && <span className="text-slate-500 italic"> (dont {committed.toFixed(2)} € engagé)</span>}
+                  </span>
                   <span>{spent.toFixed(2)} €</span>
                 </div>
               ))}
@@ -222,6 +245,11 @@ export default async function BudgetPage({
             <span>DÉPENSES TOTALES</span>
             <span className="text-red-400">{totals.spent.toFixed(2)} €</span>
           </div>
+          {totals.committed > 0 && (
+            <p className="text-xs text-slate-500">
+              dont {totals.committed.toFixed(2)} € de frais fixes engagés (factures non encore marquées payées)
+            </p>
+          )}
         </div>
       </div>
 
@@ -312,7 +340,7 @@ export default async function BudgetPage({
       )}
 
       <div className="space-y-3">
-        {rows.map(({ category, spent, spentPrev, budget, isInherited }) => {
+        {rows.map(({ category, spent, committed, spentPrev, budget, isInherited }) => {
           const planned = budget?.plannedAmount ?? 0;
           const pct = planned > 0 ? Math.min(100, (spent / planned) * 100) : 0;
           const over = planned > 0 && spent > planned;
@@ -339,6 +367,9 @@ export default async function BudgetPage({
               <div className="flex items-center justify-between text-sm flex-wrap gap-1">
                 <span className={over ? "text-red-400" : "text-slate-300"}>
                   {spent.toFixed(2)} € {planned > 0 && `/ ${planned.toFixed(2)} € (objectif)`}
+                  {committed > 0 && (
+                    <span className="text-slate-500 font-normal"> (dont {committed.toFixed(2)} € engagé)</span>
+                  )}
                 </span>
                 {planned === 0 && spent > 0 && <span className="text-xs text-amber-400">hors budget</span>}
                 {isInherited && planned > 0 && (
