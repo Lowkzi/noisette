@@ -17,15 +17,28 @@ export default async function FacturesPage() {
     prisma.account.findMany({ where: { householdId }, orderBy: { name: "asc" } }),
   ]);
 
+  const expenseBills = bills.filter((b) => b.kind === "EXPENSE");
+  const incomeBills = bills.filter((b) => b.kind === "INCOME");
+
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-bold">Factures récurrentes</h1>
+      <h1 className="text-xl font-bold">Factures & revenus récurrents</h1>
       <RecurringBillForm categories={categories} accounts={accounts} />
-      <div className="space-y-2">
-        {bills.map((bill) => (
+
+      <div className="space-y-3">
+        <h2 className="font-semibold text-sm text-slate-400">Revenus récurrents (salaire, primes...)</h2>
+        {incomeBills.map((bill) => (
           <RecurringBillRow key={bill.id} bill={bill} categories={categories} accounts={accounts} />
         ))}
-        {bills.length === 0 && <p className="text-slate-500 text-sm">Aucune facture récurrente.</p>}
+        {incomeBills.length === 0 && <p className="text-slate-500 text-sm">Aucun revenu récurrent.</p>}
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="font-semibold text-sm text-slate-400">Charges récurrentes</h2>
+        {expenseBills.map((bill) => (
+          <RecurringBillRow key={bill.id} bill={bill} categories={categories} accounts={accounts} />
+        ))}
+        {expenseBills.length === 0 && <p className="text-slate-500 text-sm">Aucune facture récurrente.</p>}
       </div>
     </div>
   );

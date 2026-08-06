@@ -195,6 +195,8 @@ model RecurringBill {
   household    Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
   label        String
   amount       Float
+  // Dépense récurrente (facture, abonnement) ou revenu récurrent (salaire, primes).
+  kind         CategoryKind @default(EXPENSE)
   dueDayOfMonth Int      // 1-31
   categoryId   String?
   category     Category? @relation(fields: [categoryId], references: [id])

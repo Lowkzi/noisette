@@ -15,6 +15,7 @@ export async function createRecurringBill(
   const validatedFields = RecurringBillFormSchema.safeParse({
     label: formData.get("label"),
     amount: formData.get("amount"),
+    kind: formData.get("kind"),
     dueDayOfMonth: formData.get("dueDayOfMonth"),
     categoryId: formData.get("categoryId"),
     accountId: formData.get("accountId"),
@@ -25,7 +26,7 @@ export async function createRecurringBill(
     return { errors: validatedFields.error.flatten().fieldErrors };
   }
 
-  const { label, amount, dueDayOfMonth, categoryId, accountId, reminderDaysBefore } =
+  const { label, amount, kind, dueDayOfMonth, categoryId, accountId, reminderDaysBefore } =
     validatedFields.data;
 
   await prisma.recurringBill.create({
@@ -33,6 +34,7 @@ export async function createRecurringBill(
       householdId,
       label,
       amount,
+      kind: kind ?? "EXPENSE",
       dueDayOfMonth,
       categoryId: categoryId || null,
       accountId: accountId || null,
@@ -42,6 +44,7 @@ export async function createRecurringBill(
 
   revalidatePath("/dashboard/factures");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/budget");
   return { success: true };
 }
 
@@ -56,6 +59,7 @@ export async function updateRecurringBill(
   const validatedFields = RecurringBillFormSchema.safeParse({
     label: formData.get("label"),
     amount: formData.get("amount"),
+    kind: formData.get("kind"),
     dueDayOfMonth: formData.get("dueDayOfMonth"),
     categoryId: formData.get("categoryId"),
     accountId: formData.get("accountId"),
@@ -66,7 +70,7 @@ export async function updateRecurringBill(
     return { errors: validatedFields.error.flatten().fieldErrors };
   }
 
-  const { label, amount, dueDayOfMonth, categoryId, accountId, reminderDaysBefore } =
+  const { label, amount, kind, dueDayOfMonth, categoryId, accountId, reminderDaysBefore } =
     validatedFields.data;
 
   await prisma.recurringBill.updateMany({
@@ -74,6 +78,7 @@ export async function updateRecurringBill(
     data: {
       label,
       amount,
+      kind: kind ?? "EXPENSE",
       dueDayOfMonth,
       categoryId: categoryId || null,
       accountId: accountId || null,
@@ -83,6 +88,7 @@ export async function updateRecurringBill(
 
   revalidatePath("/dashboard/factures");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/budget");
   return { success: true };
 }
 
@@ -99,24 +105,27 @@ export async function toggleRecurringBillActive(billId: string, isActive: boolea
   revalidatePath("/dashboard");
 }
 
-// Crée la transaction réelle correspondant à l'échéance courante et débite le compte associé,
-// via un bouton "Marquer comme payée" (pas d'automatisation par tâche planifiée).
+// Crée la transaction réelle correspondant à l'échéance courante (dépense ou revenu) et met à
+// jour le solde du compte associé, via un bouton "Marquer comme payée/reçue" (pas d'automatisation
+// par tâche planifiée).
 export async function payRecurringBill(billId: string): Promise<{ error?: string }> {
   const householdId = await getHouseholdId();
   const user = await getUser();
   if (!householdId || !user) return { error: "Foyer introuvable." };
 
   const bill = await prisma.recurringBill.findFirst({ where: { id: billId, householdId } });
-  if (!bill) return { error: "Facture introuvable." };
-  if (!bill.accountId) return { error: "Choisis d'abord un compte de prélèvement pour cette facture." };
+  if (!bill) return { error: "Introuvable." };
+  if (!bill.accountId) return { error: "Choisis d'abord un compte pour cette échéance." };
 
   const now = new Date();
   if (bill.lastPaidAt) {
     const paid = new Date(bill.lastPaidAt);
     if (paid.getFullYear() === now.getFullYear() && paid.getMonth() === now.getMonth()) {
-      return { error: "Cette facture a déjà été marquée comme payée ce mois-ci." };
+      return { error: "Déjà marqué comme réglé ce mois-ci." };
     }
   }
+
+  const isIncome = bill.kind === "INCOME";
 
   await prisma.$transaction(async (tx) => {
     await tx.transaction.create({
@@ -127,13 +136,13 @@ export async function payRecurringBill(billId: string): Promise<{ error?: string
         amount: bill.amount,
         date: now,
         label: bill.label,
-        type: "DIRECT_DEBIT",
+        type: isIncome ? "INCOME" : "DIRECT_DEBIT",
         createdById: user.id,
       },
     });
     await tx.account.update({
       where: { id: bill.accountId! },
-      data: { currentBalance: { decrement: bill.amount } },
+      data: { currentBalance: isIncome ? { increment: bill.amount } : { decrement: bill.amount } },
     });
     await tx.recurringBill.update({ where: { id: billId }, data: { lastPaidAt: now } });
   });
@@ -154,4 +163,5 @@ export async function deleteRecurringBill(billId: string) {
 
   revalidatePath("/dashboard/factures");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/budget");
 }

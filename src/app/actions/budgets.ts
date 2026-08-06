@@ -24,9 +24,10 @@ export async function upsertBudget(state: BudgetFormState, formData: FormData): 
   const category = await prisma.category.findFirst({ where: { id: categoryId, householdId } });
   if (!category) return { message: "Catégorie introuvable." };
 
-  // Le mois est toujours normalisé au 1er du mois, comme CmgEntry dans le projet modèle.
+  // Le mois est toujours normalisé au 1er du mois en heure locale, pour matcher exactement le
+  // "monthStart" utilisé par la page Budget lors de la lecture (sinon écart UTC vs local en été).
   const [year, monthNum] = month.split("-").map(Number);
-  const normalizedMonth = new Date(Date.UTC(year, monthNum - 1, 1));
+  const normalizedMonth = new Date(year, monthNum - 1, 1);
 
   await prisma.budget.upsert({
     where: { categoryId_month: { categoryId, month: normalizedMonth } },

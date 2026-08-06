@@ -161,6 +161,7 @@ export const RecurringBillFormSchema = z.object({
   amount: z.coerce
     .number({ error: "Le montant est requis." })
     .positive({ error: "Le montant doit être positif." }),
+  kind: z.enum(CATEGORY_KINDS, { error: "Type invalide." }).optional(),
   dueDayOfMonth: z.coerce
     .number({ error: "Le jour d'échéance est requis." })
     .int()

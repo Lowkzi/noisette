@@ -8,12 +8,13 @@ import {
   payRecurringBill,
 } from "@/app/actions/recurringBills";
 
-type Category = { id: string; name: string };
+type Category = { id: string; name: string; kind: string };
 type Account = { id: string; name: string };
 type Bill = {
   id: string;
   label: string;
   amount: number;
+  kind: string;
   dueDayOfMonth: number;
   reminderDaysBefore: number;
   isActive: boolean;
@@ -44,7 +45,11 @@ export function RecurringBillRow({
   const [paying, setPaying] = useState(false);
   const boundUpdate = updateRecurringBill.bind(null, bill.id);
   const [state, action, pending] = useActionState(boundUpdate, undefined);
+  const [kind, setKind] = useState<"EXPENSE" | "INCOME">(bill.kind as "EXPENSE" | "INCOME");
   const paid = isPaidThisMonth(bill.lastPaidAt);
+  const isIncome = bill.kind === "INCOME";
+
+  const filteredCategories = categories.filter((c) => c.kind === kind);
 
   async function handlePay() {
     setPaying(true);
@@ -62,11 +67,16 @@ export function RecurringBillRow({
             Le {bill.dueDayOfMonth} de chaque mois
             {bill.category ? ` · ${bill.category.name}` : ""}
             {bill.account ? ` · ${bill.account.name}` : ""}
-            {paid && <span className="text-emerald-400"> · Payée ce mois-ci</span>}
+            {paid && (
+              <span className="text-emerald-400"> · {isIncome ? "Reçu" : "Payée"} ce mois-ci</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <p className="font-semibold">{bill.amount.toFixed(2)} €</p>
+          <p className={`font-semibold ${isIncome ? "text-emerald-400" : ""}`}>
+            {isIncome ? "+" : ""}
+            {bill.amount.toFixed(2)} €
+          </p>
           {bill.isActive && (
             <button
               onClick={handlePay}
@@ -77,7 +87,7 @@ export function RecurringBillRow({
                   : "text-white bg-green-600 hover:bg-green-700 border-green-600 disabled:opacity-50"
               }`}
             >
-              {paid ? "Payée ✓" : paying ? "..." : "Marquer comme payée"}
+              {paid ? "✓" : paying ? "..." : isIncome ? "Marquer reçu" : "Marquer payée"}
             </button>
           )}
           <button
@@ -105,6 +115,24 @@ export function RecurringBillRow({
 
   return (
     <form action={action} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-3">
+      <div className="flex gap-2">
+        {(["EXPENSE", "INCOME"] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setKind(k)}
+            className={`flex-1 sm:flex-none sm:w-40 rounded-lg px-3 py-2 text-sm font-medium transition ${
+              kind === k
+                ? "bg-green-600 text-white"
+                : "bg-slate-800 border border-slate-700 text-slate-400 hover:text-white"
+            }`}
+          >
+            {k === "EXPENSE" ? "Dépense" : "Revenu"}
+          </button>
+        ))}
+        <input type="hidden" name="kind" value={kind} />
+      </div>
+
       <div className="grid sm:grid-cols-4 gap-3">
         <div>
           <label className="block text-xs text-slate-400 mb-1">Libellé</label>
@@ -164,7 +192,7 @@ export function RecurringBillRow({
             className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           >
             <option value="">—</option>
-            {categories.map((c) => (
+            {filteredCategories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -172,7 +200,7 @@ export function RecurringBillRow({
           </select>
         </div>
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Compte de prélèvement (optionnel)</label>
+          <label className="block text-xs text-slate-400 mb-1">Compte (optionnel)</label>
           <select
             name="accountId"
             defaultValue={bill.accountId ?? ""}
