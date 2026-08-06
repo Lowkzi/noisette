@@ -23,7 +23,7 @@ export default async function FacturesPage() {
       <RecurringBillForm categories={categories} accounts={accounts} />
       <div className="space-y-2">
         {bills.map((bill) => (
-          <RecurringBillRow key={bill.id} bill={bill} />
+          <RecurringBillRow key={bill.id} bill={bill} categories={categories} accounts={accounts} />
         ))}
         {bills.length === 0 && <p className="text-slate-500 text-sm">Aucune facture récurrente.</p>}
       </div>

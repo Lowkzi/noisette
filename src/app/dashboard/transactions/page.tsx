@@ -2,14 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getHouseholdId } from "@/lib/dal";
 import { TransactionForm } from "./TransactionForm";
-import { DeleteTransactionButton } from "./DeleteTransactionButton";
-
-const TYPE_LABELS: Record<string, string> = {
-  EXPENSE: "Dépense",
-  INCOME: "Revenu",
-  TRANSFER: "Virement",
-  DIRECT_DEBIT: "Prélèvement",
-};
+import { TransactionRow } from "./TransactionRow";
 
 export default async function TransactionsPage({
   searchParams,
@@ -118,39 +111,7 @@ export default async function TransactionsPage({
 
       <div className="divide-y divide-slate-800 border border-slate-800 rounded-xl overflow-hidden">
         {transactions.map((t) => (
-          <div key={t.id} className="flex items-center justify-between gap-3 p-3 bg-slate-800/30">
-            <div className="min-w-0">
-              <p className="font-medium truncate">{t.label}</p>
-              <p className="text-xs text-slate-400">
-                {new Date(t.date).toLocaleDateString("fr-FR")} · {t.account.name}
-                {t.category ? ` · ${t.category.name}` : ""} · {TYPE_LABELS[t.type]}
-                {t.isShared && t.splits.length > 0 && (
-                  <>
-                    {" "}
-                    · partagé:{" "}
-                    {t.splits
-                      .map((s) => `${s.user.name ?? s.user.email} ${s.shareAmount.toFixed(2)}€`)
-                      .join(", ")}
-                  </>
-                )}
-              </p>
-            </div>
-            <div className="text-right shrink-0 space-y-1">
-              <p
-                className={`font-semibold ${
-                  t.type === "INCOME"
-                    ? "text-emerald-400"
-                    : t.type === "EXPENSE" || t.type === "DIRECT_DEBIT"
-                      ? "text-red-400"
-                      : "text-slate-300"
-                }`}
-              >
-                {t.type === "INCOME" ? "+" : t.type === "EXPENSE" || t.type === "DIRECT_DEBIT" ? "-" : ""}
-                {t.amount.toFixed(2)} €
-              </p>
-              <DeleteTransactionButton transactionId={t.id} />
-            </div>
-          </div>
+          <TransactionRow key={t.id} transaction={t} accounts={accounts} categories={categories} />
         ))}
         {transactions.length === 0 && (
           <p className="text-slate-500 text-sm p-4">Aucune transaction pour ce mois.</p>
