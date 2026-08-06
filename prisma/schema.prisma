@@ -200,6 +200,9 @@ model RecurringBill {
   isActive     Boolean   @default(true)
   // Nombre de jours avant l'échéance pour afficher un rappel sur le tableau de bord.
   reminderDaysBefore Int @default(3)
+  // Date du dernier prélèvement confirmé (bouton "Marquer comme payée"), pour éviter
+  // un double décompte du même mois et savoir si l'échéance en cours est déjà réglée.
+  lastPaidAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

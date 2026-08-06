@@ -5,6 +5,7 @@ import {
   toggleRecurringBillActive,
   deleteRecurringBill,
   updateRecurringBill,
+  payRecurringBill,
 } from "@/app/actions/recurringBills";
 
 type Category = { id: string; name: string };
@@ -18,9 +19,17 @@ type Bill = {
   isActive: boolean;
   categoryId: string | null;
   accountId: string | null;
+  lastPaidAt: Date | null;
   category: { id: string; name: string } | null;
   account: { id: string; name: string } | null;
 };
+
+function isPaidThisMonth(lastPaidAt: Date | null) {
+  if (!lastPaidAt) return false;
+  const paid = new Date(lastPaidAt);
+  const now = new Date();
+  return paid.getFullYear() === now.getFullYear() && paid.getMonth() === now.getMonth();
+}
 
 export function RecurringBillRow({
   bill,
@@ -32,8 +41,17 @@ export function RecurringBillRow({
   accounts: Account[];
 }) {
   const [editing, setEditing] = useState(false);
+  const [paying, setPaying] = useState(false);
   const boundUpdate = updateRecurringBill.bind(null, bill.id);
   const [state, action, pending] = useActionState(boundUpdate, undefined);
+  const paid = isPaidThisMonth(bill.lastPaidAt);
+
+  async function handlePay() {
+    setPaying(true);
+    const result = await payRecurringBill(bill.id);
+    setPaying(false);
+    if (result.error) alert(result.error);
+  }
 
   if (!editing) {
     return (
@@ -44,10 +62,24 @@ export function RecurringBillRow({
             Le {bill.dueDayOfMonth} de chaque mois
             {bill.category ? ` · ${bill.category.name}` : ""}
             {bill.account ? ` · ${bill.account.name}` : ""}
+            {paid && <span className="text-emerald-400"> · Payée ce mois-ci</span>}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <p className="font-semibold">{bill.amount.toFixed(2)} €</p>
+          {bill.isActive && (
+            <button
+              onClick={handlePay}
+              disabled={paying || paid}
+              className={`text-xs font-medium rounded-lg px-2 py-1 border transition ${
+                paid
+                  ? "text-emerald-400 border-emerald-800 cursor-default"
+                  : "text-white bg-green-600 hover:bg-green-700 border-green-600 disabled:opacity-50"
+              }`}
+            >
+              {paid ? "Payée ✓" : paying ? "..." : "Marquer comme payée"}
+            </button>
+          )}
           <button
             onClick={() => setEditing(true)}
             className="text-xs text-slate-400 hover:text-white"

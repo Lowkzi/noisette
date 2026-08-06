@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getHouseholdId } from "@/lib/dal";
+import { PayBillButton } from "./_components/PayBillButton";
+
+function isPaidThisMonth(lastPaidAt: Date | null) {
+  if (!lastPaidAt) return false;
+  const paid = new Date(lastPaidAt);
+  const now = new Date();
+  return paid.getFullYear() === now.getFullYear() && paid.getMonth() === now.getMonth();
+}
 
 export default async function DashboardPage() {
   const householdId = await getHouseholdId();
@@ -136,9 +144,16 @@ export default async function DashboardPage() {
                     </span>
                   )}
                 </div>
-                <span className="text-slate-400 text-sm shrink-0">
-                  {b.amount.toFixed(2)} € · dans {b.daysUntil} j.
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-slate-400 text-sm">
+                    {b.amount.toFixed(2)} € · dans {b.daysUntil} j.
+                  </span>
+                  {isPaidThisMonth(b.lastPaidAt) ? (
+                    <span className="text-xs text-emerald-400">Payée ✓</span>
+                  ) : (
+                    b.accountId && <PayBillButton billId={b.id} />
+                  )}
+                </div>
               </div>
             ))}
           </div>
