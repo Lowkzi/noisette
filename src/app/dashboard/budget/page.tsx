@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getHouseholdId } from "@/lib/dal";
 import { BudgetForm } from "./BudgetForm";
 import { DeleteBudgetButton } from "./DeleteBudgetButton";
+import { MonthPicker } from "./MonthPicker";
 
 export default async function BudgetPage({
   searchParams,
@@ -41,15 +42,7 @@ export default async function BudgetPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Budget</h1>
-        <form method="get">
-          <input
-            type="month"
-            name="month"
-            defaultValue={month}
-            onChange={(e) => e.currentTarget.form?.requestSubmit()}
-            className="rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-sm"
-          />
-        </form>
+        <MonthPicker month={month} />
       </div>
 
       <BudgetForm categories={categories} month={month} />

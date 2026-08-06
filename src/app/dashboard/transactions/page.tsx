@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getHouseholdId } from "@/lib/dal";
 import { TransactionForm } from "./TransactionForm";
@@ -49,7 +50,23 @@ export default async function TransactionsPage({
     <div className="space-y-6">
       <h1 className="text-xl font-bold">Dépenses & revenus</h1>
 
-      <TransactionForm accounts={accounts} categories={categories} members={members} />
+      {accounts.length === 0 ? (
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-2">
+          <p className="font-semibold">Ajoute d&apos;abord un compte</p>
+          <p className="text-sm text-slate-400">
+            Il faut au moins un compte (courant, épargne, espèces...) avant de pouvoir enregistrer une
+            transaction.
+          </p>
+          <Link
+            href="/dashboard/comptes"
+            className="inline-block bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition"
+          >
+            Créer un compte
+          </Link>
+        </div>
+      ) : (
+        <TransactionForm accounts={accounts} categories={categories} members={members} />
+      )}
 
       <div className="bg-slate-800/30 border border-slate-800 rounded-xl p-4">
         <CategoryQuickAdd />

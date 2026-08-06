@@ -36,6 +36,26 @@ export default async function DashboardPage() {
     .sort((a, b) => a.daysUntil - b.daysUntil)
     .slice(0, 5);
 
+  if (accounts.length === 0) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-xl font-bold">Bienvenue sur Noisette 👋</h1>
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 space-y-4 max-w-md">
+          <p className="text-slate-300">
+            Pour commencer, crée ton premier compte (courant, épargne, espèces...). Tu pourras ensuite
+            enregistrer tes dépenses et revenus.
+          </p>
+          <Link
+            href="/dashboard/comptes"
+            className="inline-block bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition"
+          >
+            Créer mon premier compte
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <h1 className="text-xl font-bold">Tableau de bord</h1>

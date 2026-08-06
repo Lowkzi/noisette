@@ -6,11 +6,15 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { logout } from "@/app/actions/auth";
 
-const NAV_LINKS = [
-  { href: "/dashboard", label: "Tableau de bord" },
-  { href: "/dashboard/comptes", label: "Comptes" },
+// Liens du quotidien, affichés directement dans la barre.
+const PRIMARY_LINKS = [
   { href: "/dashboard/transactions", label: "Dépenses & revenus" },
+  { href: "/dashboard/comptes", label: "Comptes" },
   { href: "/dashboard/budget", label: "Budget" },
+];
+
+// Liens moins fréquents, regroupés sous "Plus" pour alléger la barre principale.
+const MORE_LINKS = [
   { href: "/dashboard/epargne", label: "Épargne" },
   { href: "/dashboard/factures", label: "Factures récurrentes" },
   { href: "/dashboard/rapports", label: "Rapports" },
@@ -25,23 +29,26 @@ type NavUser = {
 
 export function DashboardNav({ user }: { user: NavUser | null }) {
   const [open, setOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const pathname = usePathname();
   const navRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     setOpen(false);
+    setMoreOpen(false);
   }, [pathname]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open && !moreOpen) return;
     function onOutsideClick(e: MouseEvent) {
       if (navRef.current && !navRef.current.contains(e.target as Node)) {
         setOpen(false);
+        setMoreOpen(false);
       }
     }
     document.addEventListener("mousedown", onOutsideClick);
     return () => document.removeEventListener("mousedown", onOutsideClick);
-  }, [open]);
+  }, [open, moreOpen]);
 
   return (
     <nav
@@ -55,11 +62,36 @@ export function DashboardNav({ user }: { user: NavUser | null }) {
         </Link>
 
         <div className="hidden lg:flex items-center gap-5">
-          {NAV_LINKS.slice(1).map((link) => (
+          {PRIMARY_LINKS.map((link) => (
             <Link key={link.href} href={link.href} className="text-slate-400 hover:text-white transition">
               {link.label}
             </Link>
           ))}
+          <div className="relative">
+            <button
+              onClick={() => setMoreOpen((v) => !v)}
+              className="flex items-center gap-1 text-slate-400 hover:text-white transition"
+              aria-expanded={moreOpen}
+            >
+              Plus
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+            {moreOpen && (
+              <div className="absolute top-full left-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-lg py-1">
+                {MORE_LINKS.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="block px-3 py-2 text-slate-300 hover:bg-slate-700 hover:text-white transition"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="ml-auto flex items-center gap-3">
@@ -95,7 +127,7 @@ export function DashboardNav({ user }: { user: NavUser | null }) {
 
       {open && (
         <div className="lg:hidden border-t border-slate-800 px-4 py-3 space-y-1">
-          {NAV_LINKS.slice(1).map((link) => (
+          {PRIMARY_LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
@@ -104,6 +136,17 @@ export function DashboardNav({ user }: { user: NavUser | null }) {
               {link.label}
             </Link>
           ))}
+          <div className="pt-2 mt-2 border-t border-slate-800">
+            {MORE_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="block rounded-lg px-3 py-2.5 text-slate-300 hover:bg-slate-800 hover:text-white transition"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
         </div>
       )}
     </nav>

@@ -11,6 +11,19 @@ import {
   SignupFormState,
 } from "@/lib/definitions";
 
+const DEFAULT_CATEGORIES = [
+  { name: "Courses", kind: "EXPENSE" as const, color: "#22c55e" },
+  { name: "Logement", kind: "EXPENSE" as const, color: "#0ea5e9" },
+  { name: "Transport", kind: "EXPENSE" as const, color: "#f59e0b" },
+  { name: "Restaurant", kind: "EXPENSE" as const, color: "#f97316" },
+  { name: "Loisirs", kind: "EXPENSE" as const, color: "#a78bfa" },
+  { name: "Santé", kind: "EXPENSE" as const, color: "#f43f5e" },
+  { name: "Abonnements", kind: "EXPENSE" as const, color: "#38bdf8" },
+  { name: "Autre", kind: "EXPENSE" as const, color: "#94a3b8" },
+  { name: "Salaire", kind: "INCOME" as const, color: "#16a34a" },
+  { name: "Autre revenu", kind: "INCOME" as const, color: "#4ade80" },
+];
+
 export async function signup(state: SignupFormState, formData: FormData): Promise<SignupFormState> {
   const inviteId = formData.get("inviteId");
   let invite = null;
@@ -43,9 +56,13 @@ export async function signup(state: SignupFormState, formData: FormData): Promis
     return { errors: { email: ["Un compte existe déjà avec cet email."] } };
   }
 
-  const householdId = invite
-    ? invite.householdId
-    : (await prisma.household.create({ data: { name: householdName } })).id;
+  let householdId: string;
+  if (invite) {
+    householdId = invite.householdId;
+  } else {
+    householdId = (await prisma.household.create({ data: { name: householdName } })).id;
+    await prisma.category.createMany({ data: DEFAULT_CATEGORIES.map((c) => ({ ...c, householdId })) });
+  }
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
