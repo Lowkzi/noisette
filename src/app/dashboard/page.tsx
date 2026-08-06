@@ -19,12 +19,18 @@ export default async function DashboardPage() {
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const today = now.getDate();
 
-  const [accounts, budgets, spentThisMonth, savingsGoals, bills] = await Promise.all([
+  const [accounts, budgets, expenseTransactionsThisMonth, savingsGoals, bills] = await Promise.all([
     prisma.account.findMany({ where: { householdId } }),
-    prisma.budget.findMany({ where: { householdId, month: monthStart } }),
+    // Tous les objectifs jusqu'à ce mois inclus (report automatique par compte + catégorie),
+    // pour construire les rappels d'objectifs affichés sur le tableau de bord.
+    prisma.budget.findMany({
+      where: { householdId, month: { lte: monthStart } },
+      include: { category: true, account: true },
+      orderBy: { month: "asc" },
+    }),
     prisma.transaction.findMany({
       where: { householdId, type: { in: ["EXPENSE", "DIRECT_DEBIT"] }, date: { gte: monthStart, lt: monthEnd } },
-      select: { amount: true },
+      select: { amount: true, accountId: true, categoryId: true },
     }),
     prisma.savingsGoal.findMany({ where: { householdId }, orderBy: { createdAt: "asc" }, take: 3 }),
     prisma.recurringBill.findMany({
@@ -34,8 +40,22 @@ export default async function DashboardPage() {
   ]);
 
   const totalBalance = accounts.reduce((s, a) => s + a.currentBalance, 0);
-  const totalPlanned = budgets.reduce((s, b) => s + b.plannedAmount, 0);
-  const totalSpent = spentThisMonth.reduce((s, t) => s + t.amount, 0);
+  const totalSpent = expenseTransactionsThisMonth.reduce((s, t) => s + t.amount, 0);
+
+  // Le dernier objectif par (compte, catégorie) dans la liste triée par mois croissant est celui
+  // applicable à ce mois-ci (défini ce mois-ci, ou reporté d'un mois antérieur).
+  const latestBudgetByAccountCategory = new Map<string, (typeof budgets)[number]>();
+  for (const b of budgets) latestBudgetByAccountCategory.set(`${b.accountId}:${b.categoryId}`, b);
+  const budgetReminders = [...latestBudgetByAccountCategory.values()];
+
+  const spentByAccountCategory = new Map<string, number>();
+  for (const t of expenseTransactionsThisMonth) {
+    if (!t.categoryId) continue;
+    const key = `${t.accountId}:${t.categoryId}`;
+    spentByAccountCategory.set(key, (spentByAccountCategory.get(key) ?? 0) + t.amount);
+  }
+
+  const totalPlanned = budgetReminders.reduce((s, b) => s + b.plannedAmount, 0);
 
   // Une couleur stable par compte (basée sur sa position), pour les badges de la section factures.
   const ACCOUNT_COLORS = ["#22c55e", "#0ea5e9", "#f59e0b", "#a78bfa", "#f43f5e", "#38bdf8"];
@@ -73,7 +93,15 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-xl font-bold">Tableau de bord</h1>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h1 className="text-xl font-bold">Tableau de bord</h1>
+        <Link
+          href="/dashboard/transactions"
+          className="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition"
+        >
+          + Ajouter une dépense
+        </Link>
+      </div>
 
       <div className="grid sm:grid-cols-3 gap-4">
         <Link
@@ -114,6 +142,41 @@ export default async function DashboardPage() {
           <p className="text-xs text-slate-500 mt-1">Voir le détail →</p>
         </Link>
       </div>
+
+      {budgetReminders.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="font-semibold">Objectifs du mois</h2>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {budgetReminders.map((b) => {
+              const spent = spentByAccountCategory.get(`${b.accountId}:${b.categoryId}`) ?? 0;
+              const pct = b.plannedAmount > 0 ? Math.min(100, (spent / b.plannedAmount) * 100) : 0;
+              const over = spent > b.plannedAmount;
+              return (
+                <div key={b.id} className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 space-y-1.5">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">{b.category.name}</span>
+                    <span
+                      className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium"
+                      style={{
+                        backgroundColor: `${accountColor.get(b.accountId)}22`,
+                        color: accountColor.get(b.accountId),
+                      }}
+                    >
+                      {b.account.name}
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-slate-700 overflow-hidden">
+                    <div className={`h-full ${over ? "bg-red-500" : "bg-green-500"}`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <p className={`text-xs ${over ? "text-red-400" : "text-slate-400"}`}>
+                    {spent.toFixed(2)} € / {b.plannedAmount.toFixed(2)} €
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <section className="space-y-3">
         <h2 className="font-semibold">Factures à venir</h2>
