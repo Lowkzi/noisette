@@ -95,6 +95,7 @@ export default async function BudgetPage({
     incomingTransfers,
     incomeBills,
     expenseBills,
+    savingsGoalsWithContribution,
   ] = await Promise.all([
       prisma.category.findMany({ where: { householdId, kind: "EXPENSE" }, orderBy: { name: "asc" } }),
       // Tous les objectifs définis jusqu'à ce mois inclus, pour ce compte : le plus récent par
@@ -136,6 +137,11 @@ export default async function BudgetPage({
       }),
       prisma.recurringBill.findMany({
         where: { householdId, accountId, kind: "EXPENSE", isActive: true },
+      }),
+      // Objectifs d'épargne avec un versement mensuel programmé sur ce compte : à intégrer au
+      // budget comme un engagement récurrent, au même titre qu'une facture fixe.
+      prisma.savingsGoal.findMany({
+        where: { householdId, accountId, isCushion: false, monthlyContribution: { gt: 0 } },
       }),
     ]);
 
@@ -196,7 +202,8 @@ export default async function BudgetPage({
   const expectedIncome = isCurrentMonth
     ? incomeBills.filter((b) => !isReceivedThisMonth(b.lastPaidAt, now))
     : [];
-  const netBalance = totalIncome - totals.spent;
+  const totalSavings = savingsGoalsWithContribution.reduce((s, g) => s + (g.monthlyContribution ?? 0), 0);
+  const netBalance = totalIncome - totals.spent - totalSavings;
 
   const pieSlices = buildPieSlices(rows.map((r) => ({ name: r.category.name, amount: r.spent })));
 
@@ -287,7 +294,7 @@ export default async function BudgetPage({
 
         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-2">
           <p className="text-xs font-semibold text-red-400 uppercase tracking-wide">Sorties d&apos;argent</p>
-          {rows.length === 0 ? (
+          {rows.length === 0 && savingsGoalsWithContribution.length === 0 ? (
             <p className="text-sm text-slate-500">Aucune dépense ce mois-ci.</p>
           ) : (
             <div className="space-y-1 text-sm">
@@ -300,16 +307,25 @@ export default async function BudgetPage({
                   <span>{spent.toFixed(2)} €</span>
                 </div>
               ))}
+              {savingsGoalsWithContribution.map((g) => (
+                <div key={g.id} className="flex items-center justify-between text-sky-400">
+                  <span>Épargne : {g.name}</span>
+                  <span>{(g.monthlyContribution ?? 0).toFixed(2)} €</span>
+                </div>
+              ))}
             </div>
           )}
           <div className="flex items-center justify-between text-sm font-semibold pt-2 border-t border-slate-700">
             <span>DÉPENSES TOTALES</span>
-            <span className="text-red-400">{totals.spent.toFixed(2)} €</span>
+            <span className="text-red-400">{(totals.spent + totalSavings).toFixed(2)} €</span>
           </div>
           {totals.committed > 0 && (
             <p className="text-xs text-slate-500">
               dont {totals.committed.toFixed(2)} € de frais fixes engagés (factures non encore marquées payées)
             </p>
+          )}
+          {totalSavings > 0 && (
+            <p className="text-xs text-slate-500">dont {totalSavings.toFixed(2)} € d&apos;épargne mensuelle programmée</p>
           )}
         </div>
       </div>
