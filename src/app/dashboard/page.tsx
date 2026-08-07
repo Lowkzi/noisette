@@ -131,7 +131,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="flex flex-col sm:flex-row gap-4">
         {[
           {
             key: "personal-checking",
@@ -165,7 +165,7 @@ export default async function DashboardPage() {
             <Link
               key={group.key}
               href="/dashboard/comptes"
-              className={`border rounded-xl p-4 hover:border-slate-500 transition ${statusClass}`}
+              className={`flex-1 border rounded-xl p-4 hover:border-slate-500 transition ${statusClass}`}
             >
               <p className="text-xs text-slate-400">
                 {group.label}
