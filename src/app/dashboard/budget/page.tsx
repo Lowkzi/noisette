@@ -95,7 +95,8 @@ export default async function BudgetPage({
     incomingTransfers,
     incomeBills,
     expenseBills,
-    savingsGoalsWithContribution,
+    transferBills,
+    outgoingTransfers,
   ] = await Promise.all([
       prisma.category.findMany({ where: { householdId, kind: "EXPENSE" }, orderBy: { name: "asc" } }),
       // Tous les objectifs définis jusqu'à ce mois inclus, pour ce compte : le plus récent par
@@ -138,10 +139,17 @@ export default async function BudgetPage({
       prisma.recurringBill.findMany({
         where: { householdId, accountId, kind: "EXPENSE", isActive: true },
       }),
-      // Objectifs d'épargne avec un versement mensuel programmé sur ce compte : à intégrer au
-      // budget comme un engagement récurrent, au même titre qu'une facture fixe.
-      prisma.savingsGoal.findMany({
-        where: { householdId, accountId, isCushion: false, monthlyContribution: { gt: 0 } },
+      // Virements récurrents sortants depuis ce compte (ex. épargne mensuelle programmée) : au
+      // même titre qu'une facture fixe, qu'ils soient déjà exécutés ce mois-ci ou encore engagés.
+      prisma.recurringBill.findMany({
+        where: { householdId, accountId, kind: "TRANSFER", isActive: true },
+        include: { toAccount: true },
+      }),
+      // Virements sortants déjà réellement effectués ce mois-ci (transaction réelle), pour ne pas
+      // les compter une seconde fois comme "engagés" s'ils sont liés à une facture récurrente.
+      prisma.transaction.findMany({
+        where: { householdId, accountId, type: "TRANSFER", date: { gte: monthStart, lt: monthEnd } },
+        select: { amount: true, label: true, sourceRecurringBillId: true, toAccount: { select: { name: true } } },
       }),
     ]);
 
@@ -202,7 +210,15 @@ export default async function BudgetPage({
   const expectedIncome = isCurrentMonth
     ? incomeBills.filter((b) => !isReceivedThisMonth(b.lastPaidAt, now))
     : [];
-  const totalSavings = savingsGoalsWithContribution.reduce((s, g) => s + (g.monthlyContribution ?? 0), 0);
+  // Virements récurrents sortants pas encore exécutés ce mois-ci (ex. épargne à verser) : comptent
+  // comme engagés, au même titre qu'une facture fixe. Ceux déjà exécutés ce mois-ci apparaissent
+  // via outgoingTransfers (transaction réelle) et sont exclus d'ici pour ne pas être doublés.
+  const committedTransferBills = isCurrentMonth
+    ? transferBills.filter((b) => !isReceivedThisMonth(b.lastPaidAt, now))
+    : [];
+  const totalOutgoingTransfers = outgoingTransfers.reduce((s, t) => s + t.amount, 0);
+  const totalCommittedTransfers = committedTransferBills.reduce((s, b) => s + b.amount, 0);
+  const totalSavings = totalOutgoingTransfers + totalCommittedTransfers;
   const netBalance = totalIncome - totals.spent - totalSavings;
 
   const pieSlices = buildPieSlices(rows.map((r) => ({ name: r.category.name, amount: r.spent })));
@@ -294,7 +310,7 @@ export default async function BudgetPage({
 
         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-2">
           <p className="text-xs font-semibold text-red-400 uppercase tracking-wide">Sorties d&apos;argent</p>
-          {rows.length === 0 && savingsGoalsWithContribution.length === 0 ? (
+          {rows.length === 0 && outgoingTransfers.length === 0 && committedTransferBills.length === 0 ? (
             <p className="text-sm text-slate-500">Aucune dépense ce mois-ci.</p>
           ) : (
             <div className="space-y-1 text-sm">
@@ -307,10 +323,16 @@ export default async function BudgetPage({
                   <span>{spent.toFixed(2)} €</span>
                 </div>
               ))}
-              {savingsGoalsWithContribution.map((g) => (
-                <div key={g.id} className="flex items-center justify-between text-sky-400">
-                  <span>Épargne : {g.name}</span>
-                  <span>{(g.monthlyContribution ?? 0).toFixed(2)} €</span>
+              {outgoingTransfers.map((t, i) => (
+                <div key={`out-${i}`} className="flex items-center justify-between text-sky-400">
+                  <span>Virement : {t.label} → {t.toAccount?.name ?? "?"}</span>
+                  <span>{t.amount.toFixed(2)} €</span>
+                </div>
+              ))}
+              {committedTransferBills.map((b) => (
+                <div key={b.id} className="flex items-center justify-between text-sky-400 italic">
+                  <span>Virement (à verser) : {b.label} → {b.toAccount?.name ?? "?"}</span>
+                  <span>{b.amount.toFixed(2)} €</span>
                 </div>
               ))}
             </div>
@@ -325,7 +347,7 @@ export default async function BudgetPage({
             </p>
           )}
           {totalSavings > 0 && (
-            <p className="text-xs text-slate-500">dont {totalSavings.toFixed(2)} € d&apos;épargne mensuelle programmée</p>
+            <p className="text-xs text-slate-500">dont {totalSavings.toFixed(2)} € de virements sortants (épargne...)</p>
           )}
         </div>
       </div>
