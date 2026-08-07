@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getHouseholdId } from "@/lib/dal";
+import { getHouseholdId, getUser } from "@/lib/dal";
 import { AccountFormSchema, AccountFormState } from "@/lib/definitions";
 
 function parseMemberIds(raw: string | null | undefined): string[] {
@@ -21,6 +21,7 @@ export async function createAccount(state: AccountFormState, formData: FormData)
 
   const validatedFields = AccountFormSchema.safeParse({
     name: formData.get("name"),
+    bank: formData.get("bank"),
     type: formData.get("type"),
     ownership: formData.get("ownership"),
     currentBalance: formData.get("currentBalance"),
@@ -31,13 +32,14 @@ export async function createAccount(state: AccountFormState, formData: FormData)
     return { errors: validatedFields.error.flatten().fieldErrors };
   }
 
-  const { name, type, ownership, currentBalance, memberIds } = validatedFields.data;
-  const parsedMemberIds = ownership === "JOINT" ? parseMemberIds(memberIds) : [];
+  const { name, bank, type, ownership, currentBalance, memberIds } = validatedFields.data;
+  const parsedMemberIds = parseMemberIds(memberIds);
 
   await prisma.account.create({
     data: {
       householdId,
       name,
+      bank: bank || null,
       type,
       ownership,
       currentBalance,
@@ -60,6 +62,7 @@ export async function updateAccount(
 
   const validatedFields = AccountFormSchema.safeParse({
     name: formData.get("name"),
+    bank: formData.get("bank"),
     type: formData.get("type"),
     ownership: formData.get("ownership"),
     currentBalance: formData.get("currentBalance"),
@@ -70,8 +73,8 @@ export async function updateAccount(
     return { errors: validatedFields.error.flatten().fieldErrors };
   }
 
-  const { name, type, ownership, currentBalance, memberIds } = validatedFields.data;
-  const parsedMemberIds = ownership === "JOINT" ? parseMemberIds(memberIds) : [];
+  const { name, bank, type, ownership, currentBalance, memberIds } = validatedFields.data;
+  const parsedMemberIds = parseMemberIds(memberIds);
 
   const account = await prisma.account.findFirst({ where: { id: accountId, householdId } });
   if (!account) return { message: "Compte introuvable." };
@@ -80,6 +83,7 @@ export async function updateAccount(
     where: { id: accountId },
     data: {
       name,
+      bank: bank || null,
       type,
       ownership,
       currentBalance,
@@ -100,4 +104,19 @@ export async function deleteAccount(accountId: string) {
 
   revalidatePath("/dashboard/comptes");
   revalidatePath("/dashboard");
+}
+
+// Compte affiché par défaut sur Budget (et ailleurs) pour l'utilisateur courant uniquement —
+// chaque membre du foyer peut avoir une préférence différente.
+export async function setDefaultAccount(accountId: string) {
+  const householdId = await getHouseholdId();
+  const user = await getUser();
+  if (!householdId || !user) return;
+
+  const account = await prisma.account.findFirst({ where: { id: accountId, householdId } });
+  if (!account) return;
+
+  await prisma.user.update({ where: { id: user.id }, data: { defaultAccountId: accountId } });
+
+  revalidatePath("/dashboard/budget");
 }

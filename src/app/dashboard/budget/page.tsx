@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { getHouseholdId } from "@/lib/dal";
+import { getHouseholdId, getUser } from "@/lib/dal";
 import { buildPieSlices } from "@/lib/pie";
 import { BudgetForm } from "./BudgetForm";
 import { DeleteBudgetButton } from "./DeleteBudgetButton";
 import { WeeklyBreakdown } from "./WeeklyBreakdown";
+import { SetDefaultAccountButton } from "./SetDefaultAccountButton";
 
 function sumByCategory(transactions: { amount: number; categoryId: string | null }[]) {
   const map = new Map<string, number>();
@@ -39,6 +40,7 @@ export default async function BudgetPage({
   searchParams: Promise<{ month?: string; accountId?: string }>;
 }) {
   const householdId = await getHouseholdId();
+  const user = await getUser();
   const params = await searchParams;
 
   if (!householdId) return <p className="text-slate-500">Foyer introuvable.</p>;
@@ -65,8 +67,14 @@ export default async function BudgetPage({
     );
   }
 
-  const accountId = accounts.some((a) => a.id === params.accountId) ? params.accountId! : accounts[0].id;
+  // Priorité : compte choisi explicitement dans l'URL > préférence par défaut de l'utilisateur > premier compte.
+  const defaultAccountId =
+    user?.defaultAccountId && accounts.some((a) => a.id === user.defaultAccountId)
+      ? user.defaultAccountId
+      : accounts[0].id;
+  const accountId = accounts.some((a) => a.id === params.accountId) ? params.accountId! : defaultAccountId;
   const selectedAccount = accounts.find((a) => a.id === accountId)!;
+  const isUserDefault = user?.defaultAccountId === accountId;
 
   const now = new Date();
   const month = params.month ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -225,7 +233,7 @@ export default async function BudgetPage({
       </div>
 
       {accounts.length > 1 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {accounts.map((a) => (
             <Link
               key={a.id}
@@ -239,6 +247,7 @@ export default async function BudgetPage({
               {a.name}
             </Link>
           ))}
+          <SetDefaultAccountButton accountId={accountId} isDefault={isUserDefault} />
         </div>
       )}
 

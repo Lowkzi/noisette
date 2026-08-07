@@ -27,6 +27,7 @@ export const getUser = cache(async () => {
       email: true,
       role: true,
       householdId: true,
+      defaultAccountId: true,
     },
   });
 

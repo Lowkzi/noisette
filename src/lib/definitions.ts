@@ -50,6 +50,7 @@ export const ACCOUNT_OWNERSHIPS = ["INDIVIDUAL", "JOINT"] as const;
 
 export const AccountFormSchema = z.object({
   name: z.string().trim().min(1, { error: "Le nom du compte est requis." }),
+  bank: z.string().trim().nullish(),
   type: z.enum(ACCOUNT_TYPES, { error: "Type de compte invalide." }),
   ownership: z.enum(ACCOUNT_OWNERSHIPS, { error: "Type de propriété invalide." }),
   currentBalance: z.coerce.number({ error: "Le solde est requis." }),

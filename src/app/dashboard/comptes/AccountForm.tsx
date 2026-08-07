@@ -26,7 +26,7 @@ export function AccountForm({ members }: { members: Member[] }) {
   return (
     <form action={action} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-3">
       <h2 className="font-semibold">Ajouter un compte</h2>
-      <div className="grid sm:grid-cols-3 gap-3">
+      <div className="grid sm:grid-cols-4 gap-3">
         <div>
           <label className="block text-xs text-slate-400 mb-1">Nom</label>
           <input
@@ -35,6 +35,14 @@ export function AccountForm({ members }: { members: Member[] }) {
             className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           {state?.errors?.name && <p className="text-xs text-red-400 mt-1">{state.errors.name[0]}</p>}
+        </div>
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Banque (optionnel)</label>
+          <input
+            name="bank"
+            placeholder="Crédit Mutuel, BoursoBank..."
+            className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
         </div>
         <div>
           <label className="block text-xs text-slate-400 mb-1">Type</label>
@@ -87,9 +95,9 @@ export function AccountForm({ members }: { members: Member[] }) {
         </div>
       </div>
 
-      {ownership === "JOINT" && members.length > 0 && (
+      {members.length > 0 && (
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Membres affiliés</label>
+          <label className="block text-xs text-slate-400 mb-1">Membres liés à ce compte</label>
           <div className="flex flex-wrap gap-2">
             {members.map((m) => (
               <button

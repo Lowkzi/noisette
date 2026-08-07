@@ -45,6 +45,10 @@ export default async function DashboardPage() {
   ]);
 
   const totalBalance = accounts.reduce((s, a) => s + a.currentBalance, 0);
+  const totalPersonal = accounts
+    .filter((a) => a.ownership === "INDIVIDUAL")
+    .reduce((s, a) => s + a.currentBalance, 0);
+  const totalJoint = accounts.filter((a) => a.ownership === "JOINT").reduce((s, a) => s + a.currentBalance, 0);
   const totalSpent = expenseTransactionsThisMonth.reduce((s, t) => s + t.amount, 0);
 
   // Le dernier objectif par (compte, catégorie) dans la liste triée par mois croissant est celui
@@ -131,6 +135,17 @@ export default async function DashboardPage() {
           <p className={`text-2xl font-bold ${totalBalance < 0 ? "text-red-400" : "text-emerald-400"}`}>
             {totalBalance.toFixed(2)} €
           </p>
+          {accounts.some((a) => a.ownership === "JOINT") && accounts.some((a) => a.ownership === "INDIVIDUAL") && (
+            <p className="text-xs text-slate-500 mt-1">
+              <span className={totalPersonal < 0 ? "text-red-400" : ""}>
+                Perso : {totalPersonal.toFixed(2)} €
+              </span>
+              {" · "}
+              <span className={totalJoint < 0 ? "text-red-400" : "text-sky-400"}>
+                Joint : {totalJoint.toFixed(2)} €
+              </span>
+            </p>
+          )}
           {accounts.length > 0 && (
             <div className="mt-2 pt-2 border-t border-slate-700 space-y-1">
               {accounts.map((a) => {

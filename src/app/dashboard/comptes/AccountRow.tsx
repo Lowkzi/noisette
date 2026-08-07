@@ -4,11 +4,13 @@ import { useActionState, useState } from "react";
 import { updateAccount } from "@/app/actions/accounts";
 import { DeleteAccountButton } from "./DeleteAccountButton";
 import { TYPE_LABELS } from "./AccountForm";
+import { memberColor } from "@/lib/memberColors";
 
 type Member = { id: string; name: string | null; email: string };
 type Account = {
   id: string;
   name: string;
+  bank: string | null;
   type: string;
   ownership: string;
   currentBalance: number;
@@ -42,9 +44,23 @@ export function AccountRow({ account, members }: { account: Account; members: Me
               {account.ownership === "JOINT" ? "Joint" : "Individuel"}
             </span>
           </div>
-          <p className="text-xs text-slate-400">{TYPE_LABELS[account.type]}</p>
-          {account.ownership === "JOINT" && account.members.length > 0 && (
-            <p className="text-xs text-slate-500 mt-1">{account.members.map((m) => m.name ?? m.email).join(", ")}</p>
+          <p className="text-xs text-slate-400">
+            {TYPE_LABELS[account.type]}
+            {account.bank ? ` · ${account.bank}` : ""}
+          </p>
+          {account.members.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {account.members.map((m) => (
+                <span
+                  key={m.id}
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
+                  style={{ backgroundColor: `${memberColor(m.id)}22`, color: memberColor(m.id) }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: memberColor(m.id) }} />
+                  {m.name ?? m.email}
+                </span>
+              ))}
+            </div>
           )}
         </div>
         <div className="text-right space-y-1 shrink-0">
@@ -64,7 +80,7 @@ export function AccountRow({ account, members }: { account: Account; members: Me
 
   return (
     <form action={action} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-3">
-      <div className="grid sm:grid-cols-3 gap-3">
+      <div className="grid sm:grid-cols-4 gap-3">
         <div>
           <label className="block text-xs text-slate-400 mb-1">Nom</label>
           <input
@@ -74,6 +90,15 @@ export function AccountRow({ account, members }: { account: Account; members: Me
             className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           {state?.errors?.name && <p className="text-xs text-red-400 mt-1">{state.errors.name[0]}</p>}
+        </div>
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Banque (optionnel)</label>
+          <input
+            name="bank"
+            defaultValue={account.bank ?? ""}
+            placeholder="Crédit Mutuel, BoursoBank..."
+            className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
         </div>
         <div>
           <label className="block text-xs text-slate-400 mb-1">Type</label>
@@ -126,9 +151,9 @@ export function AccountRow({ account, members }: { account: Account; members: Me
         </div>
       </div>
 
-      {ownership === "JOINT" && members.length > 0 && (
+      {members.length > 0 && (
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Membres affiliés</label>
+          <label className="block text-xs text-slate-400 mb-1">Membres liés à ce compte</label>
           <div className="flex flex-wrap gap-2">
             {members.map((m) => (
               <button

@@ -61,6 +61,11 @@ model User {
   householdId String?
   household   Household? @relation(fields: [householdId], references: [id])
 
+  // Compte affiché par défaut (ex. sur la page Budget) pour cet utilisateur précis, indépendamment
+  // des autres membres du foyer.
+  defaultAccountId String?
+  defaultAccount   Account? @relation("DefaultAccountFor", fields: [defaultAccountId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -87,6 +92,7 @@ model Account {
   householdId    String
   household      Household   @relation(fields: [householdId], references: [id], onDelete: Cascade)
   name           String
+  bank           String?
   type           AccountType      @default(CHECKING)
   ownership      AccountOwnership @default(INDIVIDUAL)
   currentBalance Float            @default(0)
@@ -101,6 +107,8 @@ model Account {
   cushionGoals SavingsGoal[]
   // Membres affiliés, uniquement pertinent pour les comptes joints (ownership = JOINT).
   members User[] @relation("AccountMembers")
+  // Utilisateurs ayant choisi ce compte comme compte par défaut.
+  defaultForUsers User[] @relation("DefaultAccountFor")
 }
 
 model Category {
