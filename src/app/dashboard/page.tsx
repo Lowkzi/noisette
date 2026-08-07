@@ -251,6 +251,7 @@ export default async function DashboardPage() {
                   {b.accountId && (
                     <PayBillButton
                       billId={b.id}
+                      amount={b.amount}
                       paid={isPaidThisMonth(b.lastPaidAt)}
                       overdue={isOverdue(b.dueDayOfMonth)}
                     />

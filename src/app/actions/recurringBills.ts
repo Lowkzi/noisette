@@ -108,8 +108,9 @@ export async function toggleRecurringBillActive(billId: string, isActive: boolea
 
 // Crée la transaction réelle correspondant à l'échéance courante (dépense ou revenu) et met à
 // jour le solde du compte associé, via un bouton "Marquer comme payée/reçue" (pas d'automatisation
-// par tâche planifiée).
-export async function payRecurringBill(billId: string): Promise<{ error?: string }> {
+// par tâche planifiée). Un montant différent peut être précisé (ex. salaire variable d'un mois sur
+// l'autre) : il devient alors le nouveau montant de référence de l'échéance récurrente.
+export async function payRecurringBill(billId: string, amountOverride?: number): Promise<{ error?: string }> {
   const householdId = await getHouseholdId();
   const user = await getUser();
   if (!householdId || !user) return { error: "Foyer introuvable." };
@@ -117,6 +118,10 @@ export async function payRecurringBill(billId: string): Promise<{ error?: string
   const bill = await prisma.recurringBill.findFirst({ where: { id: billId, householdId } });
   if (!bill) return { error: "Introuvable." };
   if (!bill.accountId) return { error: "Choisis d'abord un compte pour cette échéance." };
+
+  if (amountOverride !== undefined && (Number.isNaN(amountOverride) || amountOverride <= 0)) {
+    return { error: "Montant invalide." };
+  }
 
   const now = new Date();
   if (bill.lastPaidAt) {
@@ -128,6 +133,7 @@ export async function payRecurringBill(billId: string): Promise<{ error?: string
 
   const isIncome = bill.kind === "INCOME";
   const type = isIncome ? "INCOME" : "DIRECT_DEBIT";
+  const amount = amountOverride ?? bill.amount;
 
   await prisma.$transaction(async (tx) => {
     await tx.transaction.create({
@@ -135,7 +141,7 @@ export async function payRecurringBill(billId: string): Promise<{ error?: string
         householdId,
         accountId: bill.accountId!,
         categoryId: bill.categoryId,
-        amount: bill.amount,
+        amount,
         date: now,
         label: bill.label,
         type,
@@ -143,8 +149,8 @@ export async function payRecurringBill(billId: string): Promise<{ error?: string
         sourceRecurringBillId: billId,
       },
     });
-    await applyBalanceEffect(tx, { accountId: bill.accountId!, toAccountId: null, amount: bill.amount, type }, 1);
-    await tx.recurringBill.update({ where: { id: billId }, data: { lastPaidAt: now } });
+    await applyBalanceEffect(tx, { accountId: bill.accountId!, toAccountId: null, amount, type }, 1);
+    await tx.recurringBill.update({ where: { id: billId }, data: { lastPaidAt: now, amount } });
   });
 
   revalidatePath("/dashboard/factures");
