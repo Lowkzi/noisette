@@ -44,11 +44,6 @@ export default async function DashboardPage() {
     }),
   ]);
 
-  const totalBalance = accounts.reduce((s, a) => s + a.currentBalance, 0);
-  const totalPersonal = accounts
-    .filter((a) => a.ownership === "INDIVIDUAL")
-    .reduce((s, a) => s + a.currentBalance, 0);
-  const totalJoint = accounts.filter((a) => a.ownership === "JOINT").reduce((s, a) => s + a.currentBalance, 0);
   const totalSpent = expenseTransactionsThisMonth.reduce((s, t) => s + t.amount, 0);
 
   // Le dernier objectif par (compte, catégorie) dans la liste triée par mois croissant est celui
@@ -126,46 +121,56 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="grid sm:grid-cols-3 gap-4">
-        <Link
-          href="/dashboard/comptes"
-          className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 hover:border-slate-500 transition"
-        >
-          <p className="text-xs text-slate-400">Solde total</p>
-          <p className={`text-2xl font-bold ${totalBalance < 0 ? "text-red-400" : "text-emerald-400"}`}>
-            {totalBalance.toFixed(2)} €
-          </p>
-          {accounts.some((a) => a.ownership === "JOINT") && accounts.some((a) => a.ownership === "INDIVIDUAL") && (
-            <p className="text-xs text-slate-500 mt-1">
-              <span className={totalPersonal < 0 ? "text-red-400" : ""}>
-                Perso : {totalPersonal.toFixed(2)} €
-              </span>
-              {" · "}
-              <span className={totalJoint < 0 ? "text-red-400" : "text-sky-400"}>
-                Joint : {totalJoint.toFixed(2)} €
-              </span>
-            </p>
-          )}
-          {accounts.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-slate-700 space-y-1">
-              {accounts.map((a) => {
-                const cushionBreached = cushionsBelow.some((g) => g.accountId === a.id);
-                const isNegative = a.currentBalance < 0;
-                return (
-                  <div key={a.id} className="flex items-center justify-between text-xs">
-                    <span className={`truncate ${cushionBreached ? "text-red-400" : "text-slate-400"}`}>
-                      {cushionBreached && "⚠️ "}
-                      {a.name}
-                    </span>
-                    <span className={cushionBreached || isNegative ? "text-red-400" : "text-slate-300"}>
-                      {a.currentBalance.toFixed(2)} €
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Link>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {[
+          {
+            key: "personal-checking",
+            label: "Compte courant perso",
+            accounts: accounts.filter((a) => a.ownership === "INDIVIDUAL" && a.type !== "SAVINGS"),
+          },
+          {
+            key: "personal-savings",
+            label: "Épargne perso",
+            accounts: accounts.filter((a) => a.ownership === "INDIVIDUAL" && a.type === "SAVINGS"),
+          },
+          {
+            key: "joint",
+            label: "Compte joint",
+            accounts: accounts.filter((a) => a.ownership === "JOINT"),
+          },
+        ].map((group) => {
+          if (group.accounts.length === 0) return null;
+          const total = group.accounts.reduce((s, a) => s + a.currentBalance, 0);
+          return (
+            <Link
+              key={group.key}
+              href="/dashboard/comptes"
+              className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 hover:border-slate-500 transition"
+            >
+              <p className="text-xs text-slate-400">{group.label}</p>
+              <p className={`text-2xl font-bold ${total < 0 ? "text-red-400" : "text-emerald-400"}`}>
+                {total.toFixed(2)} €
+              </p>
+              <div className="mt-2 pt-2 border-t border-slate-700 space-y-1">
+                {group.accounts.map((a) => {
+                  const cushionBreached = cushionsBelow.some((g) => g.accountId === a.id);
+                  const isNegative = a.currentBalance < 0;
+                  return (
+                    <div key={a.id} className="flex items-center justify-between text-xs">
+                      <span className={`truncate ${cushionBreached ? "text-red-400" : "text-slate-400"}`}>
+                        {cushionBreached && "⚠️ "}
+                        {a.name}
+                      </span>
+                      <span className={cushionBreached || isNegative ? "text-red-400" : "text-slate-300"}>
+                        {a.currentBalance.toFixed(2)} €
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </Link>
+          );
+        })}
 
         <Link
           href="/dashboard/budget"
