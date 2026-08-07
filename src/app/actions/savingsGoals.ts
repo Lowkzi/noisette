@@ -52,31 +52,53 @@ export async function createSavingsGoal(
   return { success: true };
 }
 
-export async function updateSavingsGoalAmount(goalId: string, formData: FormData) {
+export async function updateSavingsGoal(
+  goalId: string,
+  state: SavingsGoalFormState,
+  formData: FormData
+): Promise<SavingsGoalFormState> {
   const householdId = await getHouseholdId();
-  if (!householdId) return;
+  if (!householdId) return { message: "Foyer introuvable." };
 
-  const currentAmount = Number(formData.get("currentAmount"));
-  if (Number.isNaN(currentAmount) || currentAmount < 0) return;
+  const validatedFields = SavingsGoalFormSchema.safeParse({
+    name: formData.get("name"),
+    targetAmount: formData.get("targetAmount"),
+    currentAmount: formData.get("currentAmount"),
+    targetDate: formData.get("targetDate"),
+    monthlyContribution: formData.get("monthlyContribution"),
+    isCushion: formData.get("isCushion"),
+    accountId: formData.get("accountId"),
+  });
 
-  const rawMonthly = formData.get("monthlyContribution");
-  const monthlyContribution = rawMonthly !== null && rawMonthly !== "" ? Number(rawMonthly) : null;
-  if (monthlyContribution !== null && (Number.isNaN(monthlyContribution) || monthlyContribution < 0)) return;
+  if (!validatedFields.success) {
+    return { errors: validatedFields.error.flatten().fieldErrors };
+  }
 
-  const rawAccountId = formData.get("accountId");
-  const accountId = typeof rawAccountId === "string" && rawAccountId ? rawAccountId : null;
+  const { name, targetAmount, currentAmount, targetDate, monthlyContribution, isCushion, accountId } =
+    validatedFields.data;
+
   if (accountId) {
     const account = await prisma.account.findFirst({ where: { id: accountId, householdId } });
-    if (!account) return;
+    if (!account) return { errors: { accountId: ["Compte introuvable."] } };
   }
 
   await prisma.savingsGoal.updateMany({
     where: { id: goalId, householdId },
-    data: { currentAmount, monthlyContribution, accountId },
+    data: {
+      name,
+      targetAmount,
+      currentAmount: isCushion ? 0 : currentAmount ?? 0,
+      targetDate: targetDate ? new Date(targetDate) : null,
+      monthlyContribution: monthlyContribution || null,
+      isCushion: !!isCushion,
+      accountId: accountId || null,
+    },
   });
 
   revalidatePath("/dashboard/epargne");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/budget");
+  return { success: true };
 }
 
 export async function deleteSavingsGoal(goalId: string) {
