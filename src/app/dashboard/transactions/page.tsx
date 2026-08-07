@@ -3,6 +3,17 @@ import { prisma } from "@/lib/prisma";
 import { getHouseholdId } from "@/lib/dal";
 import { TransactionForm } from "./TransactionForm";
 import { TransactionRow } from "./TransactionRow";
+import { CategoryFilter } from "./CategoryFilter";
+
+function buildHref(base: Record<string, string | undefined>, overrides: Record<string, string | undefined>) {
+  const params = new URLSearchParams();
+  const merged = { ...base, ...overrides };
+  for (const [key, value] of Object.entries(merged)) {
+    if (value) params.set(key, value);
+  }
+  const qs = params.toString();
+  return `/dashboard/transactions${qs ? `?${qs}` : ""}`;
+}
 
 export default async function TransactionsPage({
   searchParams,
@@ -27,6 +38,10 @@ export default async function TransactionsPage({
   const [year, monthNum] = month.split("-").map(Number);
   const monthStart = new Date(year, monthNum - 1, 1);
   const monthEnd = new Date(year, monthNum, 1);
+  const prevMonthDate = new Date(year, monthNum - 2, 1);
+  const nextMonthDate = new Date(year, monthNum, 1);
+  const fmtMonth = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const monthLabel = monthStart.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
 
   const transactions = await prisma.transaction.findMany({
     where: {
@@ -38,6 +53,8 @@ export default async function TransactionsPage({
     include: { account: true, toAccount: true, category: true, splits: { include: { user: true } } },
     orderBy: { date: "desc" },
   });
+
+  const base = { month: params.month, accountId: params.accountId, categoryId: params.categoryId };
 
   return (
     <div className="space-y-6">
@@ -61,53 +78,60 @@ export default async function TransactionsPage({
         <TransactionForm accounts={accounts} categories={categories} members={members} />
       )}
 
-      <form className="flex flex-wrap gap-3 items-end text-sm" method="get">
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Mois</label>
-          <input
-            type="month"
-            name="month"
-            defaultValue={month}
-            className="rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Compte</label>
-          <select
-            name="accountId"
-            defaultValue={params.accountId ?? ""}
-            className="rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-sm"
+      <div className="space-y-3">
+        {/* Mois : flèches précédent/suivant, plus fiable que le sélecteur calendrier natif */}
+        <div className="flex items-center gap-3">
+          <Link
+            href={buildHref(base, { month: fmtMonth(prevMonthDate) })}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition"
+            aria-label="Mois précédent"
           >
-            <option value="">Tous</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Catégorie</label>
-          <select
-            name="categoryId"
-            defaultValue={params.categoryId ?? ""}
-            className="rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-sm"
+            ‹
+          </Link>
+          <span className="text-sm font-medium capitalize min-w-[9rem] text-center">{monthLabel}</span>
+          <Link
+            href={buildHref(base, { month: fmtMonth(nextMonthDate) })}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition"
+            aria-label="Mois suivant"
           >
-            <option value="">Toutes</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            ›
+          </Link>
         </div>
-        <button type="submit" className="bg-slate-700 hover:bg-slate-600 text-sm py-1.5 px-3 rounded-lg">
-          Filtrer
-        </button>
-        <Link href="/dashboard/categories" className="text-slate-400 hover:text-white text-sm py-1.5 transition">
-          Gérer les catégories →
-        </Link>
-      </form>
+
+        {/* Compte : boutons en un clic plutôt qu'un menu déroulant + bouton Filtrer séparé */}
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={buildHref(base, { accountId: undefined })}
+            className={`text-sm px-3 py-1.5 rounded-lg border transition ${
+              !params.accountId
+                ? "bg-green-600 border-green-600 text-white"
+                : "border-slate-700 text-slate-400 hover:text-white hover:border-slate-500"
+            }`}
+          >
+            Tous les comptes
+          </Link>
+          {accounts.map((a) => (
+            <Link
+              key={a.id}
+              href={buildHref(base, { accountId: a.id })}
+              className={`text-sm px-3 py-1.5 rounded-lg border transition ${
+                params.accountId === a.id
+                  ? "bg-green-600 border-green-600 text-white"
+                  : "border-slate-700 text-slate-400 hover:text-white hover:border-slate-500"
+              }`}
+            >
+              {a.name}
+            </Link>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <CategoryFilter categories={categories} categoryId={params.categoryId} />
+          <Link href="/dashboard/categories" className="text-slate-400 hover:text-white text-sm transition">
+            Gérer les catégories →
+          </Link>
+        </div>
+      </div>
 
       <div className="divide-y divide-slate-800 border border-slate-800 rounded-xl overflow-hidden">
         {transactions.map((t) => (

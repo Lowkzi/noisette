@@ -4,7 +4,6 @@ import { getHouseholdId } from "@/lib/dal";
 import { buildPieSlices } from "@/lib/pie";
 import { BudgetForm } from "./BudgetForm";
 import { DeleteBudgetButton } from "./DeleteBudgetButton";
-import { BudgetFilters } from "./BudgetFilters";
 import { WeeklyBreakdown } from "./WeeklyBreakdown";
 
 function sumByCategory(transactions: { amount: number; categoryId: string | null }[]) {
@@ -75,6 +74,8 @@ export default async function BudgetPage({
   const monthStart = new Date(year, monthNum - 1, 1);
   const monthEnd = new Date(year, monthNum, 1);
   const prevMonthStart = new Date(year, monthNum - 2, 1);
+  const nextMonthStart = new Date(year, monthNum, 1);
+  const fmtMonth = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   const isCurrentMonth = now >= monthStart && now < monthEnd;
 
   const [
@@ -202,12 +203,43 @@ export default async function BudgetPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-xl font-bold">Budget</h1>
-        <BudgetFilters month={month} accountId={accountId} accounts={accounts} />
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/dashboard/budget?${new URLSearchParams({ month: fmtMonth(prevMonthStart), accountId }).toString()}`}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition"
+            aria-label="Mois précédent"
+          >
+            ‹
+          </Link>
+          <span className="text-sm font-medium capitalize min-w-[9rem] text-center">
+            {monthStart.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
+          </span>
+          <Link
+            href={`/dashboard/budget?${new URLSearchParams({ month: fmtMonth(nextMonthStart), accountId }).toString()}`}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition"
+            aria-label="Mois suivant"
+          >
+            ›
+          </Link>
+        </div>
       </div>
+
       {accounts.length > 1 && (
-        <p className="text-xs text-slate-500 -mt-4">
-          Objectifs propres au compte <span className="text-slate-300">{selectedAccount.name}</span>.
-        </p>
+        <div className="flex flex-wrap gap-2">
+          {accounts.map((a) => (
+            <Link
+              key={a.id}
+              href={`/dashboard/budget?${new URLSearchParams({ month, accountId: a.id }).toString()}`}
+              className={`text-sm px-3 py-1.5 rounded-lg border transition ${
+                a.id === accountId
+                  ? "bg-green-600 border-green-600 text-white"
+                  : "border-slate-700 text-slate-400 hover:text-white hover:border-slate-500"
+              }`}
+            >
+              {a.name}
+            </Link>
+          ))}
+        </div>
       )}
 
       {/* Entrées / Sorties d'argent, comme le récapitulatif en tête de l'ancien fichier Excel. */}
