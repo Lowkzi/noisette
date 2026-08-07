@@ -96,6 +96,16 @@ export default async function DashboardPage() {
   }
 
   const cushionsBelow = cushions.filter((g) => g.account && g.account.currentBalance < g.targetAmount);
+  // "Presque entamé" : solde encore au-dessus du seuil mais à moins de 10% de celui-ci.
+  const cushionsNear = cushions.filter(
+    (g) => g.account && g.account.currentBalance >= g.targetAmount && g.account.currentBalance < g.targetAmount * 1.1
+  );
+
+  function tileStatus(groupAccounts: { id: string }[]) {
+    if (groupAccounts.some((a) => cushionsBelow.some((g) => g.accountId === a.id))) return "breached" as const;
+    if (groupAccounts.some((a) => cushionsNear.some((g) => g.accountId === a.id))) return "near" as const;
+    return "ok" as const;
+  }
 
   return (
     <div className="space-y-8">
@@ -127,41 +137,65 @@ export default async function DashboardPage() {
             key: "personal-checking",
             label: "Compte courant perso",
             accounts: accounts.filter((a) => a.ownership === "INDIVIDUAL" && a.type !== "SAVINGS"),
+            baseClass: "border-sky-800 bg-sky-950/20",
           },
           {
             key: "personal-savings",
             label: "Épargne perso",
             accounts: accounts.filter((a) => a.ownership === "INDIVIDUAL" && a.type === "SAVINGS"),
+            baseClass: "border-pink-800 bg-pink-950/20",
           },
           {
             key: "joint",
             label: "Compte joint",
             accounts: accounts.filter((a) => a.ownership === "JOINT"),
+            baseClass: "border-violet-800 bg-violet-950/20",
           },
         ].map((group) => {
           if (group.accounts.length === 0) return null;
           const total = group.accounts.reduce((s, a) => s + a.currentBalance, 0);
+          const status = tileStatus(group.accounts);
+          const statusClass =
+            status === "breached"
+              ? "border-red-700 bg-red-950/40"
+              : status === "near"
+                ? "border-amber-700 bg-amber-950/30"
+                : group.baseClass;
           return (
             <Link
               key={group.key}
               href="/dashboard/comptes"
-              className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 hover:border-slate-500 transition"
+              className={`border rounded-xl p-4 hover:border-slate-500 transition ${statusClass}`}
             >
-              <p className="text-xs text-slate-400">{group.label}</p>
+              <p className="text-xs text-slate-400">
+                {group.label}
+                {status === "breached" && " ⚠️"}
+                {status === "near" && " ⚡"}
+              </p>
               <p className={`text-2xl font-bold ${total < 0 ? "text-red-400" : "text-emerald-400"}`}>
                 {total.toFixed(2)} €
               </p>
-              <div className="mt-2 pt-2 border-t border-slate-700 space-y-1">
+              <div className="mt-2 pt-2 border-t border-slate-700/50 space-y-1">
                 {group.accounts.map((a) => {
                   const cushionBreached = cushionsBelow.some((g) => g.accountId === a.id);
+                  const cushionNear = cushionsNear.some((g) => g.accountId === a.id);
                   const isNegative = a.currentBalance < 0;
                   return (
                     <div key={a.id} className="flex items-center justify-between text-xs">
-                      <span className={`truncate ${cushionBreached ? "text-red-400" : "text-slate-400"}`}>
+                      <span
+                        className={`truncate ${
+                          cushionBreached ? "text-red-400" : cushionNear ? "text-amber-400" : "text-slate-400"
+                        }`}
+                      >
                         {cushionBreached && "⚠️ "}
+                        {cushionNear && "⚡ "}
                         {a.name}
                       </span>
-                      <span className={cushionBreached || isNegative ? "text-red-400" : "text-slate-300"}>
+                      <span
+                        className={
+                          cushionBreached || isNegative ? "text-red-400" : cushionNear ? "text-amber-400" : "text-slate-300"
+                        }
+                      >
                         {a.currentBalance.toFixed(2)} €
                       </span>
                     </div>
@@ -171,7 +205,9 @@ export default async function DashboardPage() {
             </Link>
           );
         })}
+      </div>
 
+      <div className="grid sm:grid-cols-2 gap-4">
         <Link
           href="/dashboard/budget"
           className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 hover:border-slate-500 transition"
