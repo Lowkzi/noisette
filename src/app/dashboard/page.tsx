@@ -137,19 +137,19 @@ export default async function DashboardPage() {
             key: "personal-checking",
             label: "Compte courant perso",
             accounts: accounts.filter((a) => a.ownership === "INDIVIDUAL" && a.type !== "SAVINGS"),
-            baseClass: "border-sky-800 bg-sky-950/20",
+            baseClass: "border-sky-400/30 bg-sky-400/5",
           },
           {
             key: "personal-savings",
             label: "Épargne perso",
             accounts: accounts.filter((a) => a.ownership === "INDIVIDUAL" && a.type === "SAVINGS"),
-            baseClass: "border-pink-800 bg-pink-950/20",
+            baseClass: "border-pink-400/30 bg-pink-400/5",
           },
           {
             key: "joint",
             label: "Compte joint",
             accounts: accounts.filter((a) => a.ownership === "JOINT"),
-            baseClass: "border-violet-800 bg-violet-950/20",
+            baseClass: "border-violet-400/30 bg-violet-400/5",
           },
         ].map((group) => {
           if (group.accounts.length === 0) return null;
@@ -157,9 +157,9 @@ export default async function DashboardPage() {
           const status = tileStatus(group.accounts);
           const statusClass =
             status === "breached"
-              ? "border-red-700 bg-red-950/40"
+              ? "border-red-400/40 bg-red-400/10"
               : status === "near"
-                ? "border-amber-700 bg-amber-950/30"
+                ? "border-amber-400/40 bg-amber-400/10"
                 : group.baseClass;
           return (
             <Link
