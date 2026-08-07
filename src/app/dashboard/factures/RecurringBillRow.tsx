@@ -21,10 +21,14 @@ type Bill = {
   isActive: boolean;
   categoryId: string | null;
   accountId: string | null;
+  toAccountId: string | null;
   lastPaidAt: Date | null;
   category: { id: string; name: string } | null;
   account: { id: string; name: string } | null;
+  toAccount: { id: string; name: string } | null;
 };
+
+const KIND_LABELS: Record<string, string> = { EXPENSE: "Dépense", INCOME: "Revenu", TRANSFER: "Virement" };
 
 function isPaidThisMonth(lastPaidAt: Date | null) {
   if (!lastPaidAt) return false;
@@ -53,12 +57,15 @@ export function RecurringBillRow({
   const [paying, setPaying] = useState(false);
   const boundUpdate = updateRecurringBill.bind(null, bill.id);
   const [state, action, pending] = useActionState(boundUpdate, undefined);
-  const [kind, setKind] = useState<"EXPENSE" | "INCOME">(bill.kind as "EXPENSE" | "INCOME");
+  const [kind, setKind] = useState<"EXPENSE" | "INCOME" | "TRANSFER">(bill.kind as "EXPENSE" | "INCOME" | "TRANSFER");
+  const [accountId, setAccountId] = useState(bill.accountId ?? accounts[0]?.id ?? "");
   const paid = isPaidThisMonth(bill.lastPaidAt);
   const isIncome = bill.kind === "INCOME";
+  const isTransfer = bill.kind === "TRANSFER";
   const overdue = !paid && isOverdue(bill.dueDayOfMonth);
 
   const filteredCategories = categories.filter((c) => c.kind === kind);
+  const destinationAccounts = accounts.filter((a) => a.id !== accountId);
 
   async function handlePay() {
     setPaying(true);
@@ -83,8 +90,12 @@ export function RecurringBillRow({
             Le {bill.dueDayOfMonth} de chaque mois
             {bill.category ? ` · ${bill.category.name}` : ""}
             {bill.account ? ` · ${bill.account.name}` : ""}
+            {isTransfer && bill.toAccount ? ` → ${bill.toAccount.name}` : ""}
             {paid && (
-              <span className="text-emerald-400"> · {isIncome ? "Reçu" : "Payée"} ce mois-ci</span>
+              <span className="text-emerald-400">
+                {" · "}
+                {isTransfer ? "Versé" : isIncome ? "Reçu" : "Payée"} ce mois-ci
+              </span>
             )}
             {overdue && <span className="text-amber-400"> · échéance dépassée, à valider</span>}
           </p>
@@ -107,7 +118,17 @@ export function RecurringBillRow({
               }`}
               title={paid ? "Cliquer pour annuler" : overdue ? "Confirmer que le prélèvement/versement a bien eu lieu" : undefined}
             >
-              {paying ? "..." : paid ? "✓ Annuler" : overdue ? "Valider" : isIncome ? "Marquer reçu" : "Marquer payée"}
+              {paying
+                ? "..."
+                : paid
+                  ? "✓ Annuler"
+                  : overdue
+                    ? "Valider"
+                    : isTransfer
+                      ? "Marquer versé"
+                      : isIncome
+                        ? "Marquer reçu"
+                        : "Marquer payée"}
             </button>
           )}
           <button
@@ -135,19 +156,19 @@ export function RecurringBillRow({
 
   return (
     <form action={action} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-3">
-      <div className="flex gap-2">
-        {(["EXPENSE", "INCOME"] as const).map((k) => (
+      <div className="grid grid-cols-3 gap-2">
+        {(["EXPENSE", "INCOME", "TRANSFER"] as const).map((k) => (
           <button
             key={k}
             type="button"
             onClick={() => setKind(k)}
-            className={`flex-1 sm:flex-none sm:w-40 rounded-lg px-3 py-2 text-sm font-medium transition ${
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
               kind === k
                 ? "bg-green-600 text-white"
                 : "bg-slate-800 border border-slate-700 text-slate-400 hover:text-white"
             }`}
           >
-            {k === "EXPENSE" ? "Dépense" : "Revenu"}
+            {KIND_LABELS[k]}
           </button>
         ))}
         <input type="hidden" name="kind" value={kind} />
@@ -204,36 +225,77 @@ export function RecurringBillRow({
         </div>
       </div>
       <div className="grid sm:grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Catégorie (optionnel)</label>
-          <select
-            name="categoryId"
-            defaultValue={bill.categoryId ?? ""}
-            className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          >
-            <option value="">—</option>
-            {filteredCategories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Compte (optionnel)</label>
-          <select
-            name="accountId"
-            defaultValue={bill.accountId ?? ""}
-            className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          >
-            <option value="">—</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {kind === "TRANSFER" ? (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Compte débité</label>
+              <select
+                name="accountId"
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+                required
+                className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Compte crédité</label>
+              <select
+                name="toAccountId"
+                defaultValue={bill.toAccountId ?? ""}
+                required
+                className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                {destinationAccounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+              {state?.errors?.toAccountId && (
+                <p className="text-xs text-red-400 mt-1">{state.errors.toAccountId[0]}</p>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Catégorie (optionnel)</label>
+              <select
+                name="categoryId"
+                defaultValue={bill.categoryId ?? ""}
+                className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="">—</option>
+                {filteredCategories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Compte (optionnel)</label>
+              <select
+                name="accountId"
+                defaultValue={bill.accountId ?? ""}
+                className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="">—</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
       </div>
       {state?.message && <p className="text-sm text-red-400">{state.message}</p>}
       <div className="flex items-center gap-2">

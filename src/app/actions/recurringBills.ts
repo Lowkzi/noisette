@@ -20,6 +20,7 @@ export async function createRecurringBill(
     dueDayOfMonth: formData.get("dueDayOfMonth"),
     categoryId: formData.get("categoryId"),
     accountId: formData.get("accountId"),
+    toAccountId: formData.get("toAccountId"),
     reminderDaysBefore: formData.get("reminderDaysBefore"),
   });
 
@@ -27,8 +28,9 @@ export async function createRecurringBill(
     return { errors: validatedFields.error.flatten().fieldErrors };
   }
 
-  const { label, amount, kind, dueDayOfMonth, categoryId, accountId, reminderDaysBefore } =
+  const { label, amount, kind, dueDayOfMonth, categoryId, accountId, toAccountId, reminderDaysBefore } =
     validatedFields.data;
+  const isTransfer = kind === "TRANSFER";
 
   await prisma.recurringBill.create({
     data: {
@@ -37,8 +39,9 @@ export async function createRecurringBill(
       amount,
       kind: kind ?? "EXPENSE",
       dueDayOfMonth,
-      categoryId: categoryId || null,
+      categoryId: isTransfer ? null : categoryId || null,
       accountId: accountId || null,
+      toAccountId: isTransfer ? toAccountId : null,
       reminderDaysBefore: reminderDaysBefore ?? 3,
     },
   });
@@ -64,6 +67,7 @@ export async function updateRecurringBill(
     dueDayOfMonth: formData.get("dueDayOfMonth"),
     categoryId: formData.get("categoryId"),
     accountId: formData.get("accountId"),
+    toAccountId: formData.get("toAccountId"),
     reminderDaysBefore: formData.get("reminderDaysBefore"),
   });
 
@@ -71,8 +75,9 @@ export async function updateRecurringBill(
     return { errors: validatedFields.error.flatten().fieldErrors };
   }
 
-  const { label, amount, kind, dueDayOfMonth, categoryId, accountId, reminderDaysBefore } =
+  const { label, amount, kind, dueDayOfMonth, categoryId, accountId, toAccountId, reminderDaysBefore } =
     validatedFields.data;
+  const isTransfer = kind === "TRANSFER";
 
   await prisma.recurringBill.updateMany({
     where: { id: billId, householdId },
@@ -81,8 +86,9 @@ export async function updateRecurringBill(
       amount,
       kind: kind ?? "EXPENSE",
       dueDayOfMonth,
-      categoryId: categoryId || null,
+      categoryId: isTransfer ? null : categoryId || null,
       accountId: accountId || null,
+      toAccountId: isTransfer ? toAccountId : null,
       reminderDaysBefore: reminderDaysBefore ?? 3,
     },
   });
@@ -106,10 +112,10 @@ export async function toggleRecurringBillActive(billId: string, isActive: boolea
   revalidatePath("/dashboard");
 }
 
-// Crée la transaction réelle correspondant à l'échéance courante (dépense ou revenu) et met à
-// jour le solde du compte associé, via un bouton "Marquer comme payée/reçue" (pas d'automatisation
-// par tâche planifiée). Un montant différent peut être précisé (ex. salaire variable d'un mois sur
-// l'autre) : il devient alors le nouveau montant de référence de l'échéance récurrente.
+// Crée la transaction réelle correspondant à l'échéance courante (dépense, revenu, ou virement
+// entre deux comptes) et met à jour le(s) solde(s) associé(s), via un bouton "Marquer" (pas
+// d'automatisation par tâche planifiée). Un montant différent peut être précisé (ex. salaire
+// variable d'un mois sur l'autre) : il devient alors le nouveau montant de référence.
 export async function payRecurringBill(billId: string, amountOverride?: number): Promise<{ error?: string }> {
   const householdId = await getHouseholdId();
   const user = await getUser();
@@ -118,6 +124,9 @@ export async function payRecurringBill(billId: string, amountOverride?: number):
   const bill = await prisma.recurringBill.findFirst({ where: { id: billId, householdId } });
   if (!bill) return { error: "Introuvable." };
   if (!bill.accountId) return { error: "Choisis d'abord un compte pour cette échéance." };
+  if (bill.kind === "TRANSFER" && !bill.toAccountId) {
+    return { error: "Choisis d'abord le compte de destination du virement." };
+  }
 
   if (amountOverride !== undefined && (Number.isNaN(amountOverride) || amountOverride <= 0)) {
     return { error: "Montant invalide." };
@@ -131,8 +140,7 @@ export async function payRecurringBill(billId: string, amountOverride?: number):
     }
   }
 
-  const isIncome = bill.kind === "INCOME";
-  const type = isIncome ? "INCOME" : "DIRECT_DEBIT";
+  const type = bill.kind === "INCOME" ? "INCOME" : bill.kind === "TRANSFER" ? "TRANSFER" : "DIRECT_DEBIT";
   const amount = amountOverride ?? bill.amount;
 
   await prisma.$transaction(async (tx) => {
@@ -140,7 +148,8 @@ export async function payRecurringBill(billId: string, amountOverride?: number):
       data: {
         householdId,
         accountId: bill.accountId!,
-        categoryId: bill.categoryId,
+        toAccountId: bill.kind === "TRANSFER" ? bill.toAccountId : null,
+        categoryId: bill.kind === "TRANSFER" ? null : bill.categoryId,
         amount,
         date: now,
         label: bill.label,
@@ -149,7 +158,11 @@ export async function payRecurringBill(billId: string, amountOverride?: number):
         sourceRecurringBillId: billId,
       },
     });
-    await applyBalanceEffect(tx, { accountId: bill.accountId!, toAccountId: null, amount, type }, 1);
+    await applyBalanceEffect(
+      tx,
+      { accountId: bill.accountId!, toAccountId: bill.kind === "TRANSFER" ? bill.toAccountId : null, amount, type },
+      1
+    );
     await tx.recurringBill.update({ where: { id: billId }, data: { lastPaidAt: now, amount } });
   });
 
@@ -161,8 +174,8 @@ export async function payRecurringBill(billId: string, amountOverride?: number):
   return {};
 }
 
-// Annule un "Marquer comme payée/reçue" : supprime la transaction générée, restaure le solde,
-// et efface le statut "réglé ce mois-ci" pour permettre de le remarquer plus tard si besoin.
+// Annule un "Marquer comme payée/reçue/versée" : supprime la transaction générée, restaure le(s)
+// solde(s), et efface le statut "réglé ce mois-ci" pour permettre de le remarquer plus tard si besoin.
 export async function unmarkRecurringBillPaid(billId: string): Promise<{ error?: string }> {
   const householdId = await getHouseholdId();
   if (!householdId) return { error: "Foyer introuvable." };
@@ -181,13 +194,14 @@ export async function unmarkRecurringBillPaid(billId: string): Promise<{ error?:
     const paidAt = new Date(bill.lastPaidAt);
     const monthStart = new Date(paidAt.getFullYear(), paidAt.getMonth(), 1);
     const monthEnd = new Date(paidAt.getFullYear(), paidAt.getMonth() + 1, 1);
+    const type = bill.kind === "INCOME" ? "INCOME" : bill.kind === "TRANSFER" ? "TRANSFER" : "DIRECT_DEBIT";
     transaction = await prisma.transaction.findFirst({
       where: {
         householdId,
         accountId: bill.accountId,
         amount: bill.amount,
         label: bill.label,
-        type: bill.kind === "INCOME" ? "INCOME" : "DIRECT_DEBIT",
+        type,
         date: { gte: monthStart, lt: monthEnd },
       },
       orderBy: { date: "desc" },
@@ -215,7 +229,7 @@ export async function unmarkRecurringBillPaid(billId: string): Promise<{ error?:
   if (!transaction) {
     return {
       error:
-        "Statut « payée » annulé. Aucune transaction correspondante n'a été retrouvée automatiquement (paiement antérieur à cette fonctionnalité) — vérifie le solde du compte et supprime-la manuellement si besoin.",
+        "Statut annulé. Aucune transaction correspondante n'a été retrouvée automatiquement (antérieure à cette fonctionnalité) — vérifie le(s) solde(s) et supprime-la manuellement si besoin.",
     };
   }
   return {};

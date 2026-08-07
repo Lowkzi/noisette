@@ -40,7 +40,7 @@ export default async function DashboardPage() {
     prisma.savingsGoal.findMany({ where: { householdId, isCushion: true }, include: { account: true } }),
     prisma.recurringBill.findMany({
       where: { householdId, isActive: true },
-      include: { account: true },
+      include: { account: true, toAccount: true },
     }),
   ]);
 
@@ -297,6 +297,7 @@ export default async function DashboardPage() {
                         style={{ backgroundColor: accountColor.get(b.account.id) }}
                       />
                       {b.account.name}
+                      {b.kind === "TRANSFER" && b.toAccount ? ` → ${b.toAccount.name}` : ""}
                     </span>
                   )}
                 </div>

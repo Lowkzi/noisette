@@ -177,21 +177,33 @@ export type SavingsGoalFormState =
     }
   | undefined;
 
-export const RecurringBillFormSchema = z.object({
-  label: z.string().trim().min(1, { error: "Le libellé est requis." }),
-  amount: z.coerce
-    .number({ error: "Le montant est requis." })
-    .positive({ error: "Le montant doit être positif." }),
-  kind: z.enum(CATEGORY_KINDS, { error: "Type invalide." }).optional(),
-  dueDayOfMonth: z.coerce
-    .number({ error: "Le jour d'échéance est requis." })
-    .int()
-    .min(1, { error: "Doit être entre 1 et 31." })
-    .max(31, { error: "Doit être entre 1 et 31." }),
-  categoryId: z.string().trim().nullish(),
-  accountId: z.string().trim().nullish(),
-  reminderDaysBefore: z.coerce.number().int().min(0).max(30).optional(),
-});
+export const RECURRING_KINDS = ["EXPENSE", "INCOME", "TRANSFER"] as const;
+
+export const RecurringBillFormSchema = z
+  .object({
+    label: z.string().trim().min(1, { error: "Le libellé est requis." }),
+    amount: z.coerce
+      .number({ error: "Le montant est requis." })
+      .positive({ error: "Le montant doit être positif." }),
+    kind: z.enum(RECURRING_KINDS, { error: "Type invalide." }).optional(),
+    dueDayOfMonth: z.coerce
+      .number({ error: "Le jour d'échéance est requis." })
+      .int()
+      .min(1, { error: "Doit être entre 1 et 31." })
+      .max(31, { error: "Doit être entre 1 et 31." }),
+    categoryId: z.string().trim().nullish(),
+    accountId: z.string().trim().nullish(),
+    toAccountId: z.string().trim().nullish(),
+    reminderDaysBefore: z.coerce.number().int().min(0).max(30).optional(),
+  })
+  .refine((data) => data.kind !== "TRANSFER" || !!data.toAccountId, {
+    error: "Merci de choisir le compte de destination du virement.",
+    path: ["toAccountId"],
+  })
+  .refine((data) => data.kind !== "TRANSFER" || data.toAccountId !== data.accountId, {
+    error: "Le compte de destination doit être différent du compte débité.",
+    path: ["toAccountId"],
+  });
 
 export type RecurringBillFormState =
   | {
@@ -201,6 +213,7 @@ export type RecurringBillFormState =
         dueDayOfMonth?: string[];
         categoryId?: string[];
         accountId?: string[];
+        toAccountId?: string[];
       };
       message?: string;
       success?: boolean;
